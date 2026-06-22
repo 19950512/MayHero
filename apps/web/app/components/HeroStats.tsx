@@ -1,7 +1,7 @@
 'use client'
 
 import { useGameStore } from '../store/gameStore'
-import { computeStats, getHeroLoadout } from '../game/engine'
+import { computeStats, getHeroLoadout, normalizeSkillAllocationsForLevel } from '../game/engine'
 import { RARITY_COLORS } from '../game/data'
 import { HERO_CLASS_BY_ID } from '../game/classes'
 import type { Equipment, SkillAllocStat } from '../game/types'
@@ -19,7 +19,7 @@ export function HeroStats() {
 
   const stats = computeStats(hero)
   const xpPct = (hero.xp / hero.xpToNext) * 100
-  const alloc = hero.skillAllocations ?? { atk: 0, def: 0, maxHp: 0, spd: 0 }
+  const alloc = normalizeSkillAllocationsForLevel(hero)
   const classData = HERO_CLASS_BY_ID[hero.class]
   const loadout = getHeroLoadout(hero)
 

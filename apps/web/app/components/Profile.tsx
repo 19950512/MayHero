@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { api } from '../lib/api'
 import { CLASS_ICONS } from '../game/data'
+import { normalizeSkillAllocationsForLevel } from '../game/engine'
 
 const CLASS_DISPLAY: Record<string, string> = {
   warrior: 'Guerreiro',
@@ -25,6 +26,10 @@ export function Profile() {
   const [errorMsg, setErrorMsg] = useState('')
 
   if (!hero) return null
+
+  const alloc = normalizeSkillAllocationsForLevel(hero)
+  const allocatedPoints = alloc.atk + alloc.def + alloc.maxHp + alloc.spd
+  const availableSkillPoints = Math.max(0, (hero.level - 1) - allocatedPoints)
 
   const startEdit = () => {
     setNameInput(hero.name)
@@ -163,7 +168,7 @@ export function Profile() {
             <p className="text-amber-100/45 text-xs">Experiência</p>
           </div>
           <div className="bg-black/25 rounded-lg p-2.5">
-            <p className="text-amber-100 font-bold">{hero.skillPoints}</p>
+            <p className="text-amber-100 font-bold">{availableSkillPoints}</p>
             <p className="text-amber-100/45 text-xs">Pontos disponíveis</p>
           </div>
         </div>

@@ -10,6 +10,7 @@ import { HeroStats } from './HeroStats'
 import { Inventory } from './Inventory'
 import { ZoneSelector } from './ZoneSelector'
 import { Profile } from './Profile'
+import type { Equipment } from '../game/types'
 
 type Tab = 'battle' | 'stats' | 'inventory' | 'zones' | 'profile'
 
@@ -42,11 +43,48 @@ export function GameUI() {
     setServerAuthoritativeRewards,
     startServerEncounter,
     applyServerVictoryResolution,
+    replaceInventory,
   } = useGameStore()
   const { user, logout } = useAuthStore()
   const lastSyncRef = useRef<number>(0)
   const lastVictoryKeyRef = useRef<string | null>(null)
   const battleStartPendingRef = useRef(false)
+  const inventoryHydratedRef = useRef(false)
+
+  const toEquipment = (value: unknown): Equipment | null => {
+    if (!value || typeof value !== 'object') return null
+    const raw = value as Record<string, unknown>
+    if (
+      typeof raw.id !== 'string' ||
+      typeof raw.name !== 'string' ||
+      typeof raw.slot !== 'string' ||
+      typeof raw.rarity !== 'string' ||
+      typeof raw.icon !== 'string' ||
+      typeof raw.requiredLevel !== 'number' ||
+      !raw.bonuses ||
+      typeof raw.bonuses !== 'object'
+    ) {
+      return null
+    }
+
+    if (!['weapon', 'armor', 'helm', 'ring'].includes(raw.slot)) return null
+    if (!['common', 'rare', 'epic', 'legendary'].includes(raw.rarity)) return null
+
+    const bonuses = raw.bonuses as Record<string, unknown>
+    for (const val of Object.values(bonuses)) {
+      if (typeof val !== 'number' || !Number.isFinite(val)) return null
+    }
+
+    return {
+      id: raw.id,
+      name: raw.name,
+      slot: raw.slot as Equipment['slot'],
+      rarity: raw.rarity as Equipment['rarity'],
+      bonuses: bonuses as Equipment['bonuses'],
+      icon: raw.icon,
+      requiredLevel: raw.requiredLevel,
+    }
+  }
 
   const runTick = useCallback(() => { tick() }, [tick])
   useEffect(() => {
@@ -56,7 +94,26 @@ export function GameUI() {
 
   useEffect(() => {
     setServerAuthoritativeRewards(!!user)
+    if (!user) inventoryHydratedRef.current = false
   }, [user, setServerAuthoritativeRewards])
+
+  // Hydrate local inventory from API once per authenticated session in this UI lifecycle.
+  useEffect(() => {
+    if (!user || !hero) return
+    if (inventoryHydratedRef.current) return
+
+    api.hero.inventory()
+      .then(dbItems => {
+        const items = dbItems
+          .map(db => toEquipment(db.itemData))
+          .filter((item): item is Equipment => !!item)
+        replaceInventory(items)
+        inventoryHydratedRef.current = true
+      })
+      .catch(() => {
+        // Ignore transient failures; local inventory remains available.
+      })
+  }, [user, hero, replaceInventory])
 
   useEffect(() => {
     // On refresh, persisted user may be stale; validate session with backend.
@@ -201,11 +258,27 @@ export function GameUI() {
     <div className="flex flex-col h-screen bg-[radial-gradient(circle_at_top,#3a2b17_0%,#1b140d_30%,#100d08_70%,#0a0907_100%)] text-[var(--parchment)] select-none overflow-hidden">
       {/* Title bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-[#1a140f]/90 border-b border-amber-900/40 drag-region shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 hidden sm:flex">
           <span className="text-amber-200 text-xs font-semibold tracking-[0.2em]">MAY HERO</span>
           {user && (
             <span className="text-amber-100/40 text-xs">@{user.username}</span>
           )}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-amber-100/60">Nível</span>
+            <span className="text-amber-200 font-bold">{hero.level}</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-1">
+            <span className="text-amber-100/60">XP</span>
+            <span className="text-blue-300 font-semibold">{hero.xp}/{hero.xpToNext}</span>
+          </div>
+          <div className="w-32 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 rounded-full transition-all duration-300"
+              style={{ width: `${(hero.xp / hero.xpToNext) * 100}%` }}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2 no-drag">
           {/* Sync indicator */}

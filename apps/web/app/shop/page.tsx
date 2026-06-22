@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { api } from '../lib/api'
 import { RARITY_COLORS } from '../game/data'
 import { useAuthStore } from '../store/authStore'
+import { useGameStore } from '../store/gameStore'
+import type { Equipment } from '../game/types'
 
 type Listing = {
   id: string
@@ -34,6 +36,45 @@ export default function ShopPage() {
   const [buying, setBuying] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const { user, logout } = useAuthStore()
+  const { addInventoryItem } = useGameStore()
+
+  const toEquipment = (value: unknown): Equipment | null => {
+    if (!value || typeof value !== 'object') return null
+    const raw = value as Record<string, unknown>
+
+    if (
+      typeof raw.id !== 'string' ||
+      typeof raw.name !== 'string' ||
+      typeof raw.slot !== 'string' ||
+      typeof raw.rarity !== 'string' ||
+      typeof raw.icon !== 'string' ||
+      typeof raw.requiredLevel !== 'number' ||
+      !raw.bonuses ||
+      typeof raw.bonuses !== 'object'
+    ) {
+      return null
+    }
+
+    const slot = raw.slot
+    const rarity = raw.rarity
+    if (!['weapon', 'armor', 'helm', 'ring'].includes(slot)) return null
+    if (!['common', 'rare', 'epic', 'legendary'].includes(rarity)) return null
+
+    const bonuses = raw.bonuses as Record<string, unknown>
+    for (const val of Object.values(bonuses)) {
+      if (typeof val !== 'number' || !Number.isFinite(val)) return null
+    }
+
+    return {
+      id: raw.id,
+      name: raw.name,
+      slot: slot as Equipment['slot'],
+      rarity: rarity as Equipment['rarity'],
+      bonuses: bonuses as Equipment['bonuses'],
+      icon: raw.icon,
+      requiredLevel: raw.requiredLevel,
+    }
+  }
 
   const load = (p = 1) => {
     api.shop.list(p)
@@ -51,8 +92,10 @@ export default function ShopPage() {
     if (!user) { setMsg({ text: 'Faça login para comprar.', ok: false }); return }
     setBuying(id)
     try {
-      await api.shop.buy(id)
-      setMsg({ text: 'Item comprado! Sincronize o jogo para ver no inventário.', ok: true })
+      const result = await api.shop.buy(id)
+      const bought = toEquipment(result.item)
+      if (bought) addInventoryItem(bought)
+      setMsg({ text: 'Item comprado! Já foi enviado ao seu inventário.', ok: true })
       load(page)
     } catch (e: unknown) {
       setMsg({ text: e instanceof Error ? e.message : 'Erro ao comprar.', ok: false })

@@ -2,6 +2,27 @@ import type { Hero, HeroLoadout, Enemy, BattleLog, BattleState, Equipment, ItemD
 import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
 
 const ZERO_ALLOC = { atk: 0, def: 0, maxHp: 0, spd: 0 }
+const SKILL_ALLOC_ORDER: SkillAllocStat[] = ['atk', 'def', 'maxHp', 'spd']
+
+function getSkillPointsEarnedByLevel(level: number): number {
+  return Math.max(0, level - 1)
+}
+
+export function normalizeSkillAllocationsForLevel(hero: Hero): Hero['skillAllocations'] {
+  const raw = hero.skillAllocations ?? ZERO_ALLOC
+  const cap = getSkillPointsEarnedByLevel(hero.level)
+  let remaining = cap
+
+  const normalized: Hero['skillAllocations'] = { atk: 0, def: 0, maxHp: 0, spd: 0 }
+  for (const stat of SKILL_ALLOC_ORDER) {
+    const value = Math.max(0, Math.floor(raw[stat] ?? 0))
+    const taken = Math.min(value, remaining)
+    normalized[stat] = taken
+    remaining -= taken
+  }
+
+  return normalized
+}
 
 const RARITY_PRIORITY: Record<Equipment['rarity'], number> = {
   common: 1,
@@ -150,7 +171,7 @@ export function computeStats(hero: Hero): Hero['stats'] {
     }
   }
 
-  const alloc = hero.skillAllocations ?? ZERO_ALLOC
+  const alloc = normalizeSkillAllocationsForLevel(hero)
   base.atk += alloc.atk * 2
   base.def += alloc.def
   base.maxHp += alloc.maxHp * 10
@@ -402,10 +423,14 @@ export function equipItem(hero: Hero, item: Equipment): { hero: Hero; replacedIt
 }
 
 export function allocateSkillPoint(hero: Hero, stat: SkillAllocStat): Hero | null {
-  if (hero.skillPoints <= 0) return null
-  const prev = hero.skillAllocations ?? ZERO_ALLOC
+  const prev = normalizeSkillAllocationsForLevel(hero)
+  const spent = prev.atk + prev.def + prev.maxHp + prev.spd
+  const earned = getSkillPointsEarnedByLevel(hero.level)
+  const available = Math.max(0, earned - spent)
+  if (available <= 0) return null
+
   const newAllocations = { ...prev, [stat]: prev[stat] + 1 }
-  const updated = { ...hero, skillPoints: hero.skillPoints - 1, skillAllocations: newAllocations }
+  const updated = { ...hero, skillPoints: available - 1, skillAllocations: newAllocations }
   const newStats = computeStats(updated)
   return { ...updated, stats: { ...newStats, hp: Math.min(newStats.maxHp, hero.stats.hp) } }
 }

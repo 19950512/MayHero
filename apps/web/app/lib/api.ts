@@ -20,14 +20,15 @@ function getLegacyToken(): string | null {
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const legacyToken = getLegacyToken()
+  const hasBody = body !== undefined
   const res = await fetch(`${API_URL}${path}`, {
     method,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: hasBody ? JSON.stringify(body) : undefined,
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? 'Erro desconhecido')

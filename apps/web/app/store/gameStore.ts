@@ -43,6 +43,8 @@ interface GameState {
   toggleAutoFight: () => void
   changeZone: (zoneId: number) => void
   equipItemFromInventory: (item: Equipment) => void
+  addInventoryItem: (item: Equipment) => void
+  replaceInventory: (items: Equipment[]) => void
   dismissNotification: (id: string) => void
   resetGame: () => void
   usePotion: () => void
@@ -287,6 +289,15 @@ export const useGameStore = create<GameState>()(
         set({ hero: updatedHero, inventory: newInventory })
       },
 
+      addInventoryItem: (item) => {
+        const { inventory } = get()
+        set({ inventory: [...inventory, item] })
+      },
+
+      replaceInventory: (items) => {
+        set({ inventory: items })
+      },
+
       dismissNotification: (id) =>
         set(s => ({ notifications: s.notifications.filter(n => n.id !== id) })),
 
@@ -375,6 +386,13 @@ export const useGameStore = create<GameState>()(
           newNotifs.push({ id: `item-${now}-${stackDrop.itemId}`, message: `Drop: ${stackDrop.name} x${stackDrop.quantity}`, type: 'item' })
         }
 
+        const alloc = hero.skillAllocations ?? { atk: 0, def: 0, maxHp: 0, spd: 0 }
+        const allocatedPoints = alloc.atk + alloc.def + alloc.maxHp + alloc.spd
+        const levelsGained = Math.max(0, payload.hero.level - hero.level)
+        const maxSpendableAtLevel = Math.max(0, payload.hero.level - 1)
+        const remainingAfterAlloc = Math.max(0, maxSpendableAtLevel - allocatedPoints)
+        const nextSkillPoints = Math.min(hero.skillPoints + levelsGained, remainingAfterAlloc)
+
         set({
           hero: {
             ...hero,
@@ -383,7 +401,7 @@ export const useGameStore = create<GameState>()(
             xpToNext: payload.hero.xpToNext,
             gold: payload.hero.gold,
             totalKills: payload.hero.totalKills,
-            skillPoints: payload.hero.skillPoints,
+            skillPoints: nextSkillPoints,
             stats: payload.hero.stats,
             baseStats: payload.hero.baseStats,
           },

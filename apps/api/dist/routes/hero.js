@@ -107,13 +107,12 @@ export async function heroRoutes(app) {
         const hero = await prisma.hero.findUnique({ where: { userId: sub } });
         if (!hero)
             return reply.status(404).send({ error: 'Herói não encontrado.' });
-        // Progressão sensível agora é autoritativa no servidor.
+        // Progressão sensível é majoritariamente autoritativa no servidor.
         if (body.data.level !== hero.level ||
             body.data.xp !== hero.xp ||
             body.data.xpToNext !== hero.xpToNext ||
             body.data.gold !== hero.gold ||
             body.data.totalKills !== hero.totalKills ||
-            body.data.skillPoints !== hero.skillPoints ||
             body.data.class !== hero.class) {
             return reply.status(400).send({ error: 'Campos de progressão são autoritativos no servidor.' });
         }
@@ -150,7 +149,7 @@ export async function heroRoutes(app) {
                 xpToNext: hero.xpToNext,
                 gold: hero.gold,
                 totalKills: hero.totalKills,
-                skillPoints: hero.skillPoints,
+                skillPoints: heroData.skillPoints,
                 currentZone: heroData.currentZone,
                 statsJson: heroData.stats,
                 baseStatsJson: heroData.baseStats,

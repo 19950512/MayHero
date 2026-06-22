@@ -21,59 +21,59 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(circle_at_top,#3a2b17_0%,#1b140d_30%,#100d08_70%,#0a0907_100%)] text-[#e8d7b2]">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-white">⚔️ May Hero</h1>
-          <p className="text-white/40 text-sm mt-1">Crie sua conta e comece a aventura</p>
+          <h1 className="text-4xl font-black text-amber-100 font-serif">⚔️ May Hero</h1>
+          <p className="text-amber-100/40 text-sm mt-2">Crie sua conta e comece a aventura</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-slate-900 rounded-2xl p-6 border border-white/10 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="bg-[#1a140f]/80 rounded-xl p-6 border border-amber-900/40 flex flex-col gap-4 backdrop-blur-sm">
           {error && (
-            <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm flex justify-between">
+            <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-3 text-red-300 text-sm flex justify-between">
               {error}
               <button type="button" onClick={clearError} className="text-red-400 hover:text-red-200">×</button>
             </div>
           )}
 
           <div>
-            <label className="text-white/50 text-xs uppercase font-bold mb-1 block">Usuário</label>
+            <label className="text-amber-100/60 text-xs uppercase font-bold mb-2 block tracking-wider">Usuário</label>
             <input
               type="text" value={username} onChange={e => setUsername(e.target.value)}
               required placeholder="MayHero123" minLength={3} maxLength={20}
               pattern="[a-zA-Z0-9_]+"
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/20 outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-[#0f0a06] border border-amber-900/30 rounded-lg px-3 py-2.5 text-amber-50 text-sm placeholder-amber-900/40 outline-none focus:border-amber-700/60 focus:ring-1 focus:ring-amber-700/30 transition-colors"
             />
           </div>
 
           <div>
-            <label className="text-white/50 text-xs uppercase font-bold mb-1 block">Email</label>
+            <label className="text-amber-100/60 text-xs uppercase font-bold mb-2 block tracking-wider">Email</label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               required placeholder="seu@email.com"
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/20 outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-[#0f0a06] border border-amber-900/30 rounded-lg px-3 py-2.5 text-amber-50 text-sm placeholder-amber-900/40 outline-none focus:border-amber-700/60 focus:ring-1 focus:ring-amber-700/30 transition-colors"
             />
           </div>
 
           <div>
-            <label className="text-white/50 text-xs uppercase font-bold mb-1 block">Senha</label>
+            <label className="text-amber-100/60 text-xs uppercase font-bold mb-2 block tracking-wider">Senha</label>
             <input
               type="password" value={password} onChange={e => setPassword(e.target.value)}
               required placeholder="mínimo 6 caracteres" minLength={6}
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/20 outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-[#0f0a06] border border-amber-900/30 rounded-lg px-3 py-2.5 text-amber-50 text-sm placeholder-amber-900/40 outline-none focus:border-amber-700/60 focus:ring-1 focus:ring-amber-700/30 transition-colors"
             />
           </div>
 
           <button
             type="submit" disabled={loading}
-            className="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-600 hover:to-purple-600 disabled:opacity-50 text-white transition-all"
+            className="w-full py-3 rounded-lg font-bold bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-amber-50 transition-all uppercase tracking-wider text-sm"
           >
             {loading ? 'Criando conta...' : 'Criar Conta'}
           </button>
 
-          <p className="text-center text-white/30 text-sm">
+          <p className="text-center text-amber-100/40 text-sm">
             Já tem conta?{' '}
-            <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Entrar</Link>
+            <Link href="/login" className="text-amber-300 hover:text-amber-200 font-semibold">Entrar</Link>
           </p>
         </form>
       </div>
