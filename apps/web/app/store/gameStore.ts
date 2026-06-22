@@ -25,6 +25,7 @@ interface Notification {
 
 interface GameState {
   hero: Hero | null
+  heroMessage: string
   battle: BattleState
   currentZone: number
   inventory: Equipment[]
@@ -45,6 +46,7 @@ interface GameState {
   usePotion: () => void
   spendSkillPoint: (stat: SkillAllocStat) => void
   renameHero: (newName: string) => void
+  setHeroMessage: (message: string) => void
 }
 
 const IDLE_BATTLE_STATE: BattleState = {
@@ -64,6 +66,7 @@ export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
       hero: null,
+      heroMessage: '',
       battle: IDLE_BATTLE_STATE,
       currentZone: 1,
       inventory: [],
@@ -77,6 +80,7 @@ export const useGameStore = create<GameState>()(
         const hero = createHero(name, heroClass)
         set({
           hero,
+          heroMessage: '',
           gameStarted: true,
           battle: IDLE_BATTLE_STATE,
           currentZone: 1,
@@ -216,10 +220,9 @@ export const useGameStore = create<GameState>()(
       equipItemFromInventory: (item) => {
         const { hero, inventory } = get()
         if (!hero) return
-        const updatedHero = equipItem(hero, item)
-        const currentEquipped = hero.equipment[item.slot]
+        const { hero: updatedHero, replacedItem } = equipItem(hero, item)
         const newInventory = inventory.filter(i => i.id !== item.id || i !== item)
-        if (currentEquipped) newInventory.push(currentEquipped)
+        if (replacedItem) newInventory.push(replacedItem)
         set({ hero: updatedHero, inventory: newInventory })
       },
 
@@ -258,9 +261,15 @@ export const useGameStore = create<GameState>()(
         set({ hero: { ...hero, name: newName.trim() } })
       },
 
+      setHeroMessage: (message) => {
+        const normalized = message.slice(0, 180)
+        set({ heroMessage: normalized })
+      },
+
       resetGame: () =>
         set({
           hero: null,
+          heroMessage: '',
           battle: IDLE_BATTLE_STATE,
           currentZone: 1,
           inventory: [],
@@ -276,6 +285,7 @@ export const useGameStore = create<GameState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         hero: state.hero,
+        heroMessage: state.heroMessage,
         currentZone: state.currentZone,
         inventory: state.inventory,
         stackableInventory: state.stackableInventory,

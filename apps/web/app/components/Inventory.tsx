@@ -54,7 +54,7 @@ export function Inventory() {
         level: hero.level, xp: hero.xp, xpToNext: hero.xpToNext,
         gold: hero.gold, totalKills: hero.totalKills, skillPoints: hero.skillPoints,
         currentZone, stats: hero.stats, baseStats: hero.baseStats,
-        equipment: hero.equipment, inventory,
+        equipment: hero.equipment, loadout: hero.loadout, inventory,
         stackableInventory,
       }
       try {

@@ -86,6 +86,41 @@ export interface SkillAllocations {
   spd: number
 }
 
+export interface HeroAccessoriesLoadout {
+  amulet?: Equipment
+  ring1?: Equipment
+  ring2?: Equipment
+  ring3?: Equipment
+  ring4?: Equipment
+  cornalina1?: Equipment
+  cornalina2?: Equipment
+  talisma1?: Equipment
+  talisma2?: Equipment
+  belt?: Equipment
+  earring1?: Equipment
+  earring2?: Equipment
+}
+
+export interface HeroEquipmentLoadout {
+  head?: Equipment
+  body?: Equipment
+  legs?: Equipment
+  boots?: Equipment
+  offhand?: Equipment
+  mainhand?: Equipment
+}
+
+export interface HeroPetLoadout {
+  pet1?: Equipment
+  pet2?: Equipment
+}
+
+export interface HeroLoadout {
+  accessories: HeroAccessoriesLoadout
+  equipment: HeroEquipmentLoadout
+  pets: HeroPetLoadout
+}
+
 export interface Hero {
   name: string
   class: HeroClass
@@ -100,6 +135,7 @@ export interface Hero {
     helm?: Equipment
     ring?: Equipment
   }
+  loadout: HeroLoadout
   gold: number
   totalKills: number
   skillPoints: number

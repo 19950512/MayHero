@@ -63,6 +63,7 @@ export function GameUI() {
       stats: hero.stats,
       baseStats: hero.baseStats,
       equipment: hero.equipment,
+      loadout: hero.loadout,
       inventory,
       stackableInventory,
     }

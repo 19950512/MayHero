@@ -1,4 +1,4 @@
-import type { Hero, Enemy, BattleLog, BattleState, Equipment, ItemDefinition, SkillAllocStat } from './types'
+import type { Hero, HeroLoadout, Enemy, BattleLog, BattleState, Equipment, ItemDefinition, SkillAllocStat } from './types'
 import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
 
 const ZERO_ALLOC = { atk: 0, def: 0, maxHp: 0, spd: 0 }
@@ -19,6 +19,104 @@ interface StackableDropResult {
   itemId: string
   name: string
   quantity: number
+}
+
+const EMPTY_LOADOUT: HeroLoadout = {
+  accessories: {
+    amulet: undefined,
+    ring1: undefined,
+    ring2: undefined,
+    ring3: undefined,
+    ring4: undefined,
+    cornalina1: undefined,
+    cornalina2: undefined,
+    talisma1: undefined,
+    talisma2: undefined,
+    belt: undefined,
+    earring1: undefined,
+    earring2: undefined,
+  },
+  equipment: {
+    head: undefined,
+    body: undefined,
+    legs: undefined,
+    boots: undefined,
+    offhand: undefined,
+    mainhand: undefined,
+  },
+  pets: {
+    pet1: undefined,
+    pet2: undefined,
+  },
+}
+
+function getLegacyLoadout(hero: Hero): HeroLoadout {
+  return {
+    ...EMPTY_LOADOUT,
+    accessories: {
+      ...EMPTY_LOADOUT.accessories,
+      ring1: hero.equipment.ring,
+    },
+    equipment: {
+      ...EMPTY_LOADOUT.equipment,
+      head: hero.equipment.helm,
+      body: hero.equipment.armor,
+      mainhand: hero.equipment.weapon,
+    },
+    pets: { ...EMPTY_LOADOUT.pets },
+  }
+}
+
+export function getHeroLoadout(hero: Hero): HeroLoadout {
+  if (!hero.loadout) return getLegacyLoadout(hero)
+  return {
+    accessories: {
+      ...EMPTY_LOADOUT.accessories,
+      ...hero.loadout.accessories,
+    },
+    equipment: {
+      ...EMPTY_LOADOUT.equipment,
+      ...hero.loadout.equipment,
+    },
+    pets: {
+      ...EMPTY_LOADOUT.pets,
+      ...hero.loadout.pets,
+    },
+  }
+}
+
+function buildLegacyEquipmentFromLoadout(loadout: HeroLoadout): Hero['equipment'] {
+  return {
+    weapon: loadout.equipment.mainhand,
+    armor: loadout.equipment.body,
+    helm: loadout.equipment.head,
+    ring: loadout.accessories.ring1,
+  }
+}
+
+function getEquippedItemsFromLoadout(loadout: HeroLoadout): Equipment[] {
+  return [
+    loadout.equipment.mainhand,
+    loadout.equipment.offhand,
+    loadout.equipment.head,
+    loadout.equipment.body,
+    loadout.equipment.legs,
+    loadout.equipment.boots,
+    loadout.accessories.amulet,
+    loadout.accessories.ring1,
+    loadout.accessories.ring2,
+    loadout.accessories.ring3,
+    loadout.accessories.ring4,
+    loadout.accessories.cornalina1,
+    loadout.accessories.cornalina2,
+    loadout.accessories.talisma1,
+    loadout.accessories.talisma2,
+    loadout.accessories.belt,
+    loadout.accessories.earring1,
+    loadout.accessories.earring2,
+    loadout.pets.pet1,
+    loadout.pets.pet2,
+  ].filter((item): item is Equipment => !!item)
 }
 
 function resolveMonsterDrops(enemy: Enemy): ResolvedMonsterDrop[] {
@@ -42,9 +140,10 @@ function resolveMonsterDrops(enemy: Enemy): ResolvedMonsterDrop[] {
 
 export function computeStats(hero: Hero): Hero['stats'] {
   const base = { ...hero.baseStats }
+  const loadout = getHeroLoadout(hero)
+  const equippedItems = getEquippedItemsFromLoadout(loadout)
 
-  for (const equip of Object.values(hero.equipment)) {
-    if (!equip) continue
+  for (const equip of equippedItems) {
     for (const [key, val] of Object.entries(equip.bonuses)) {
       const k = key as keyof typeof base
       if (k in base) (base[k] as number) += val as number
@@ -265,12 +364,41 @@ export function healHero(hero: Hero, amount: number): Hero {
   return { ...hero, stats: { ...hero.stats, hp: newHp } }
 }
 
-export function equipItem(hero: Hero, item: Equipment): Hero {
-  const newEquipment = { ...hero.equipment, [item.slot]: item }
+export function equipItem(hero: Hero, item: Equipment): { hero: Hero; replacedItem?: Equipment } {
+  const loadout = getHeroLoadout(hero)
+  let replacedItem: Equipment | undefined
+
+  if (item.slot === 'weapon') {
+    replacedItem = loadout.equipment.mainhand
+    loadout.equipment.mainhand = item
+  }
+
+  if (item.slot === 'armor') {
+    replacedItem = loadout.equipment.body
+    loadout.equipment.body = item
+  }
+
+  if (item.slot === 'helm') {
+    replacedItem = loadout.equipment.head
+    loadout.equipment.head = item
+  }
+
+  if (item.slot === 'ring') {
+    const ringSlots: Array<keyof HeroLoadout['accessories']> = ['ring1', 'ring2', 'ring3', 'ring4']
+    const firstEmpty = ringSlots.find(slot => !loadout.accessories[slot])
+    const targetSlot = firstEmpty ?? 'ring1'
+    replacedItem = loadout.accessories[targetSlot]
+    loadout.accessories[targetSlot] = item
+  }
+
+  const newEquipment = buildLegacyEquipmentFromLoadout(loadout)
   const newBaseStats = getBaseStatsForLevel(hero)
-  const newHero = { ...hero, equipment: newEquipment, baseStats: newBaseStats }
+  const newHero = { ...hero, equipment: newEquipment, loadout, baseStats: newBaseStats }
   const newStats = computeStats(newHero)
-  return { ...newHero, stats: { ...newStats, hp: Math.min(newStats.maxHp, hero.stats.hp) } }
+  return {
+    hero: { ...newHero, stats: { ...newStats, hp: Math.min(newStats.maxHp, hero.stats.hp) } },
+    replacedItem,
+  }
 }
 
 export function allocateSkillPoint(hero: Hero, stat: SkillAllocStat): Hero | null {
@@ -293,6 +421,7 @@ export function createHero(name: string, heroClass: Hero['class']): Hero {
     baseStats: base,
     stats: { ...base },
     equipment: {},
+    loadout: { ...EMPTY_LOADOUT, accessories: { ...EMPTY_LOADOUT.accessories }, equipment: { ...EMPTY_LOADOUT.equipment }, pets: { ...EMPTY_LOADOUT.pets } },
     gold: 0,
     totalKills: 0,
     skillPoints: 0,
