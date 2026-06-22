@@ -43,6 +43,7 @@ interface GameState {
   resetGame: () => void
   usePotion: () => void
   spendSkillPoint: (stat: SkillAllocStat) => void
+  renameHero: (newName: string) => void
 }
 
 const IDLE_BATTLE_STATE: BattleState = {
@@ -117,7 +118,7 @@ export const useGameStore = create<GameState>()(
               enemy,
               enemyCurrentHp: enemy.stats.maxHp,
               turn: 0,
-              logs: [{ id: 'start', turn: 0, actor: 'hero', message: `${enemy.isBoss ? '⚠️ CHEFE! ' : ''}Você enfrenta ${enemy.name}!` }],
+              logs: [{ id: 'start', turn: 0, actor: 'hero', message: `${enemy.isBoss ? 'CHEFE! ' : ''}Você enfrenta ${enemy.name}!` }],
               phase: 'fighting',
               lastTickAt: now,
             },
@@ -136,12 +137,12 @@ export const useGameStore = create<GameState>()(
               { id: `xp-${now}`, message: `+${xpEarned} XP`, type: 'xp' },
               { id: `gold-${now}`, message: `+${goldEarned} ouro`, type: 'gold' },
             ]
-            if (leveledUp) newNotifs.push({ id: `lvl-${now}`, message: `⬆️ Nível ${updatedHero.level}!`, type: 'levelup' })
+            if (leveledUp) newNotifs.push({ id: `lvl-${now}`, message: `Nível ${updatedHero.level}!`, type: 'levelup' })
 
             const newInventory = [...get().inventory]
             if (itemDrop) {
               newInventory.push(itemDrop)
-              newNotifs.push({ id: `item-${now}`, message: `🎁 Drop: ${itemDrop.icon} ${itemDrop.name}`, type: 'item' })
+              newNotifs.push({ id: `item-${now}`, message: `Drop: ${itemDrop.name}`, type: 'item' })
             }
 
             set({
@@ -160,7 +161,7 @@ export const useGameStore = create<GameState>()(
             })
           } else if (result.phase === 'defeat') {
             const newNotifs: Notification[] = [
-              { id: `defeat-${now}`, message: `💀 Derrotado! -10% ouro`, type: 'defeat' },
+              { id: `defeat-${now}`, message: `Derrotado! -10% ouro`, type: 'defeat' },
             ]
             set({
               hero: { ...hero, stats: { ...hero.stats, hp: 0 } },
@@ -227,6 +228,12 @@ export const useGameStore = create<GameState>()(
         if (!hero) return
         const updated = allocateSkillPoint(hero, stat)
         if (updated) set({ hero: updated })
+      },
+
+      renameHero: (newName) => {
+        const { hero } = get()
+        if (!hero) return
+        set({ hero: { ...hero, name: newName.trim() } })
       },
 
       resetGame: () =>

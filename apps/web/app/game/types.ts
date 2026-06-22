@@ -1,4 +1,4 @@
-export type HeroClass = 'warrior' | 'archer' | 'mage'
+export type HeroClass = 'warrior' | 'archer' | 'mage' | 'paladin' | 'druid' | 'knight'
 
 export interface Stats {
   hp: number

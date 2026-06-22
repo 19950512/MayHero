@@ -42,6 +42,7 @@ export const api = {
     create: (data: { name: string; class: string; stats: unknown; baseStats: unknown }) =>
       req<Record<string, unknown>>('POST', '/hero', data),
     sync: (data: Record<string, unknown>) => req<{ ok: boolean }>('PATCH', '/hero/sync', data),
+    rename: (name: string) => req<{ ok: boolean; name: string }>('PATCH', '/hero/rename', { name }),
   },
 
   rankings: {

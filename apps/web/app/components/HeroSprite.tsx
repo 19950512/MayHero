@@ -10,9 +10,12 @@ interface Props {
 }
 
 const CLASS_COLORS: Record<string, string> = {
-  warrior: 'from-red-900 to-red-700',
-  archer: 'from-green-900 to-green-700',
-  mage: 'from-indigo-900 to-indigo-700',
+  warrior: 'from-amber-900 to-amber-700',
+  archer:  'from-emerald-900 to-emerald-700',
+  mage:    'from-cyan-900 to-cyan-700',
+  knight:  'from-stone-700 to-stone-500',
+  paladin: 'from-yellow-800 to-yellow-600',
+  druid:   'from-green-900 to-teal-700',
 }
 
 export function HeroSprite({ hero, isAttacking, isDead }: Props) {
@@ -27,8 +30,8 @@ export function HeroSprite({ hero, isAttacking, isDead }: Props) {
       <div
         className={`
           w-14 h-14 rounded-full bg-gradient-to-b ${CLASS_COLORS[hero.class]}
-          flex items-center justify-center text-3xl
-          shadow-lg border-2 border-white/20
+          flex items-center justify-center text-xs font-bold tracking-widest
+          shadow-lg border-2 border-amber-100/30 text-amber-50
           ${isAttacking ? 'scale-110' : ''}
           transition-transform duration-150
         `}

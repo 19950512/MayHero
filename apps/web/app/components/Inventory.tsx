@@ -48,6 +48,8 @@ export function Inventory() {
     try {
       // Ensure hero is synced to DB so inventory items have IDs
       const syncData = {
+        name: hero.name,
+        class: hero.class,
         level: hero.level, xp: hero.xp, xpToNext: hero.xpToNext,
         gold: hero.gold, totalKills: hero.totalKills, skillPoints: hero.skillPoints,
         currentZone, stats: hero.stats, baseStats: hero.baseStats,
@@ -157,7 +159,7 @@ export function Inventory() {
                           <p className="text-red-400 text-xs mb-1.5">{form.error}</p>
                         )}
                         <div className="flex gap-2 items-center">
-                          <span className="text-yellow-400 text-xs">🪙</span>
+                          <span className="text-yellow-400 text-xs">Ouro</span>
                           <input
                             type="number"
                             min={1}

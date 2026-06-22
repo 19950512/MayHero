@@ -11,6 +11,7 @@ interface Props {
 
 export function EnemySprite({ enemy, currentHp, isAttacking, isDead }: Props) {
   const hpPct = (currentHp / enemy.stats.maxHp) * 100
+  const enemySigil = enemy.name.slice(0, 2).toUpperCase()
 
   return (
     <div
@@ -22,14 +23,14 @@ export function EnemySprite({ enemy, currentHp, isAttacking, isDead }: Props) {
     >
       <div
         className={`
-          w-14 h-14 rounded-full bg-gradient-to-b from-gray-800 to-gray-600
-          flex items-center justify-center text-3xl
-          shadow-lg border-2 ${enemy.isBoss ? 'border-yellow-400' : 'border-white/20'}
+          w-14 h-14 rounded-full bg-gradient-to-b from-stone-700 to-stone-500
+          flex items-center justify-center text-xs font-bold tracking-widest text-stone-100
+          shadow-lg border-2 ${enemy.isBoss ? 'border-amber-400' : 'border-stone-300/30'}
           transition-transform duration-150
           ${enemy.isBoss ? 'scale-110' : ''}
         `}
       >
-        {enemy.emoji}
+        {enemySigil}
       </div>
       <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
         <div
@@ -39,7 +40,7 @@ export function EnemySprite({ enemy, currentHp, isAttacking, isDead }: Props) {
       </div>
       <span className="text-xs font-bold text-white/60 truncate max-w-[72px] text-center">
         {enemy.name}
-        {enemy.isBoss && ' 👑'}
+        {enemy.isBoss && ' (Chefe)'}
       </span>
     </div>
   )

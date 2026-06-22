@@ -3,14 +3,18 @@ import { z } from 'zod'
 import { prisma } from '../db.js'
 import { redis } from '../redis.js'
 
+const HERO_CLASSES = ['warrior', 'archer', 'mage', 'knight', 'paladin', 'druid'] as const
+
 const CreateHeroBody = z.object({
   name: z.string().min(1).max(20),
-  class: z.enum(['warrior', 'archer', 'mage']),
+  class: z.enum(HERO_CLASSES),
   stats: z.record(z.unknown()),
   baseStats: z.record(z.unknown()),
 })
 
 const SyncHeroBody = z.object({
+  name: z.string().min(1).max(20),
+  class: z.enum(HERO_CLASSES),
   level: z.number().int().min(1),
   xp: z.number().int().min(0),
   xpToNext: z.number().int().min(1),
@@ -85,6 +89,8 @@ export async function heroRoutes(app: FastifyInstance) {
     const updatedHero = await prisma.hero.update({
       where: { userId: sub },
       data: {
+        name: heroData.name,
+        class: heroData.class,
         level: heroData.level,
         xp: heroData.xp,
         xpToNext: heroData.xpToNext,
@@ -124,5 +130,18 @@ export async function heroRoutes(app: FastifyInstance) {
     await redis.zadd('leaderboard:kills', updatedHero.totalKills, hero.id)
 
     return { ok: true }
+  })
+
+  // Rename hero
+  app.patch('/hero/rename', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { sub } = req.user as { sub: string }
+    const body = z.object({ name: z.string().min(1).max(20) }).safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.issues[0].message })
+
+    const hero = await prisma.hero.findUnique({ where: { userId: sub } })
+    if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
+
+    await prisma.hero.update({ where: { id: hero.id }, data: { name: body.data.name } })
+    return { ok: true, name: body.data.name }
   })
 }

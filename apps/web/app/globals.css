@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+:root {
+  --ink: #f6eed9;
+  --parchment: #e8d7b2;
+  --gold: #e4b15d;
+  --gold-strong: #bd7f31;
+  --wood-dark: #17110b;
+  --wood-mid: #2a1d12;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,10 +16,17 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  background: #020617; /* slate-950 */
-  color: #f1f5f9;
+  background: radial-gradient(circle at 12% 0%, #3c2a1b 0%, #1e160f 35%, #110d08 70%, #080706 100%);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-medieval-title), serif;
+  letter-spacing: 0.04em;
 }
 
 /* Electron drag region */

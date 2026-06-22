@@ -73,28 +73,72 @@ export async function shopRoutes(app: FastifyInstance) {
     const buyer = await prisma.hero.findUnique({ where: { userId: sub } })
     if (!buyer) return reply.status(404).send({ error: 'Herói não encontrado.' })
 
-    const listing = await prisma.shopListing.findUnique({
+    const listingPreview = await prisma.shopListing.findUnique({
       where: { id },
-      include: { seller: true },
+      select: { id: true, soldAt: true },
     })
+    if (!listingPreview || listingPreview.soldAt) {
+      return reply.status(404).send({ error: 'Anúncio não encontrado.' })
+    }
 
-    if (!listing || listing.soldAt) return reply.status(404).send({ error: 'Anúncio não encontrado.' })
-    if (listing.sellerId === buyer.id) return reply.status(400).send({ error: 'Você não pode comprar seu próprio item.' })
-    if (buyer.gold < listing.price) return reply.status(400).send({ error: 'Ouro insuficiente.' })
+    try {
+      const boughtItem = await prisma.$transaction(async (tx) => {
+        const freshListing = await tx.shopListing.findUnique({
+          where: { id },
+          include: { seller: true, inventoryItem: true },
+        })
 
-    // Transaction: deduct gold from buyer, add to seller, transfer item
-    await prisma.$transaction([
-      // Deduct buyer gold
-      prisma.hero.update({ where: { id: buyer.id }, data: { gold: { decrement: listing.price } } }),
-      // Add gold to seller
-      prisma.hero.update({ where: { id: listing.sellerId }, data: { gold: { increment: listing.price } } }),
-      // Mark listing as sold
-      prisma.shopListing.update({ where: { id }, data: { buyerId: buyer.id, soldAt: new Date() } }),
-      // Transfer inventory item to buyer
-      prisma.inventoryItem.update({ where: { id: listing.inventoryItemId }, data: { heroId: buyer.id } }),
-    ])
+        if (!freshListing || freshListing.soldAt) {
+          throw new Error('Anúncio não encontrado.')
+        }
+        if (freshListing.sellerId === buyer.id) {
+          throw new Error('Você não pode comprar seu próprio item.')
+        }
 
-    return { ok: true, item: listing.itemData }
+        const buyerPaid = await tx.hero.updateMany({
+          where: { id: buyer.id, gold: { gte: freshListing.price } },
+          data: { gold: { decrement: freshListing.price } },
+        })
+        if (buyerPaid.count === 0) throw new Error('Ouro insuficiente.')
+
+        await tx.hero.update({
+          where: { id: freshListing.sellerId },
+          data: { gold: { increment: freshListing.price } },
+        })
+
+        const sold = await tx.shopListing.updateMany({
+          where: { id: freshListing.id, soldAt: null },
+          data: { buyerId: buyer.id, soldAt: new Date() },
+        })
+        if (sold.count === 0) {
+          throw new Error('Este anúncio acabou de ser vendido.')
+        }
+
+        const transferred = await tx.inventoryItem.updateMany({
+          where: {
+            id: freshListing.inventoryItemId,
+            heroId: freshListing.sellerId,
+          },
+          data: { heroId: buyer.id },
+        })
+        if (transferred.count === 0) {
+          throw new Error('Item indisponível para transferência.')
+        }
+
+        return freshListing.itemData
+      })
+
+      return { ok: true, item: boughtItem }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao comprar item.'
+      const status =
+        message === 'Anúncio não encontrado.' ? 404
+          : message === 'Você não pode comprar seu próprio item.' ? 400
+            : message === 'Ouro insuficiente.' ? 400
+              : message === 'Este anúncio acabou de ser vendido.' ? 409
+                : 400
+      return reply.status(status).send({ error: message })
+    }
   })
 
   // Remove own listing

@@ -5,13 +5,16 @@ import Link from 'next/link'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { api } from '../lib/api'
-import { BASE_STATS, CLASS_ICONS } from '../game/data'
+import { BASE_STATS } from '../game/data'
 import type { HeroClass } from '../game/types'
 
-const CLASS_DESCRIPTIONS: Record<HeroClass, { name: string; desc: string; color: string }> = {
-  warrior: { name: 'Guerreiro', desc: 'Alta vida e defesa. Resistente e confiável.', color: 'border-red-600 bg-red-900/30' },
-  archer:  { name: 'Arqueiro', desc: 'Alto crítico e velocidade. Ataca rápido.', color: 'border-green-600 bg-green-900/30' },
-  mage:    { name: 'Mago', desc: 'Altíssimo ataque. Frágil mas devastador.', color: 'border-indigo-600 bg-indigo-900/30' },
+const CLASS_DESCRIPTIONS: Record<HeroClass, { name: string; desc: string; color: string; sigil: string }> = {
+  warrior: { name: 'Guerreiro',     sigil: 'GU', desc: 'Linha de frente versátil. Equilíbrio entre ataque e defesa.',              color: 'border-amber-600/70 bg-amber-950/40' },
+  archer:  { name: 'Arqueiro',      sigil: 'AR', desc: 'Alta velocidade e crítico. Desfere golpes certeiros à distância.',         color: 'border-green-600/70 bg-green-950/30' },
+  mage:    { name: 'Sorcerer',      sigil: 'MA', desc: 'Poder arcano supremo. Frágil mas de dano devastador.',                      color: 'border-cyan-600/70 bg-cyan-950/30' },
+  knight:  { name: 'Knight',        sigil: 'KN', desc: 'Fortaleza viva em armadura pesada. Excelência em sobrevivência.',           color: 'border-stone-400/70 bg-stone-800/40' },
+  paladin: { name: 'Paladin',       sigil: 'PA', desc: 'Guerreiro sagrado com luz divina. Equilíbrio entre força e proteção.',      color: 'border-yellow-500/70 bg-yellow-950/30' },
+  druid:   { name: 'Druid',         sigil: 'DR', desc: 'Manipulador da natureza. Alto dano mágico com mobilidade sobrenatural.',     color: 'border-emerald-500/70 bg-emerald-950/30' },
 }
 
 export function CharacterCreation() {
@@ -57,21 +60,21 @@ export function CharacterCreation() {
   const stats = BASE_STATS[selectedClass]
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
+    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto text-[var(--ink)]">
       <div className="text-center pt-2">
-        <h1 className="text-2xl font-black text-white tracking-tight">⚔️ May Hero</h1>
-        <p className="text-white/40 text-xs mt-1">Idle RPG — Crie seu herói</p>
+        <h1 className="text-3xl font-bold tracking-[0.08em] text-amber-100">May Hero</h1>
+        <p className="text-amber-100/60 text-xs mt-1 tracking-wide">Crônicas Medievais de Guerra e Magia</p>
       </div>
 
       {/* Auth status */}
       {user ? (
-        <div className="bg-green-900/20 border border-green-500/30 rounded-xl px-3 py-2 text-green-300 text-xs text-center">
-          ✓ Logado como <strong>@{user.username}</strong> — progresso salvo online
+        <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl px-3 py-2 text-emerald-200 text-xs text-center">
+          Conta conectada como <strong>@{user.username}</strong> com progresso online
         </div>
       ) : (
-        <div className="bg-slate-800/50 border border-white/10 rounded-xl px-3 py-2 text-white/40 text-xs text-center">
+        <div className="bg-[#1e1711]/60 border border-amber-100/10 rounded-xl px-3 py-2 text-amber-100/50 text-xs text-center">
           Jogando offline.{' '}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Entrar</Link>
+          <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
           {' '}para salvar progresso e acessar rankings.
         </div>
       )}
@@ -83,20 +86,20 @@ export function CharacterCreation() {
       )}
 
       <div>
-        <label className="text-white/50 text-xs uppercase font-bold mb-1.5 block">Nome do Herói</label>
+        <label className="text-amber-100/70 text-xs uppercase font-bold mb-1.5 block tracking-wide">Nome do Herói</label>
         <input
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Digite seu nome..."
           maxLength={16}
-          className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/20 outline-none focus:border-indigo-500 transition-colors"
+          className="w-full bg-[#19120d] border border-amber-100/15 rounded-xl px-3 py-2.5 text-amber-50 text-sm placeholder-amber-100/20 outline-none focus:border-amber-500/60 transition-colors"
           onKeyDown={e => e.key === 'Enter' && handleStart()}
         />
       </div>
 
       <div>
-        <label className="text-white/50 text-xs uppercase font-bold mb-1.5 block">Classe</label>
+        <label className="text-amber-100/70 text-xs uppercase font-bold mb-1.5 block tracking-wide">Ordem de Combate</label>
         <div className="flex flex-col gap-2">
           {(Object.keys(CLASS_DESCRIPTIONS) as HeroClass[]).map(cls => {
             const info = CLASS_DESCRIPTIONS[cls]
@@ -107,16 +110,16 @@ export function CharacterCreation() {
                 onClick={() => setSelectedClass(cls)}
                 className={`
                   w-full rounded-xl p-3 text-left border-2 transition-all
-                  ${selected ? info.color : 'border-white/10 bg-slate-800/40 hover:bg-slate-800/60'}
+                  ${selected ? info.color : 'border-amber-100/10 bg-[#17110d]/70 hover:bg-[#21180f]/80'}
                 `}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{CLASS_ICONS[cls]}</span>
+                  <span className="w-9 h-9 rounded-full border border-amber-200/30 bg-amber-900/30 flex items-center justify-center text-[11px] font-bold tracking-widest shrink-0">{info.sigil}</span>
                   <div>
-                    <p className="text-white font-bold text-sm">{info.name}</p>
-                    <p className="text-white/40 text-xs">{info.desc}</p>
+                    <p className="text-amber-50 font-bold text-sm tracking-wide">{info.name}</p>
+                    <p className="text-amber-100/55 text-xs">{info.desc}</p>
                   </div>
-                  {selected && <span className="ml-auto text-white/60 text-xs">✓</span>}
+                  {selected && <span className="ml-auto text-amber-200/80 text-xs uppercase tracking-wider">ativa</span>}
                 </div>
               </button>
             )
@@ -124,23 +127,27 @@ export function CharacterCreation() {
         </div>
       </div>
 
-      <div className="bg-slate-800/50 rounded-xl p-3 border border-white/5">
-        <p className="text-white/40 text-xs uppercase font-bold mb-2">Status Inicial</p>
+      <div className="bg-[#16110c]/70 rounded-xl p-3 border border-amber-100/10">
+        <p className="text-amber-100/55 text-xs uppercase font-bold mb-2 tracking-wide">Atributos Iniciais</p>
         <div className="grid grid-cols-4 gap-2 text-center">
-          <div><p className="text-white font-bold text-sm">{stats.maxHp}</p><p className="text-white/30 text-xs">HP</p></div>
-          <div><p className="text-white font-bold text-sm">{stats.atk}</p><p className="text-white/30 text-xs">ATK</p></div>
-          <div><p className="text-white font-bold text-sm">{stats.def}</p><p className="text-white/30 text-xs">DEF</p></div>
-          <div><p className="text-white font-bold text-sm">{stats.crit}%</p><p className="text-white/30 text-xs">CRIT</p></div>
+          <div><p className="text-amber-100 font-bold text-sm">{stats.maxHp}</p><p className="text-amber-100/35 text-xs">HP</p></div>
+          <div><p className="text-amber-100 font-bold text-sm">{stats.atk}</p><p className="text-amber-100/35 text-xs">ATK</p></div>
+          <div><p className="text-amber-100 font-bold text-sm">{stats.def}</p><p className="text-amber-100/35 text-xs">DEF</p></div>
+          <div><p className="text-amber-100 font-bold text-sm">{stats.crit}%</p><p className="text-amber-100/35 text-xs">CRIT</p></div>
         </div>
       </div>
 
       <button
         onClick={handleStart}
         disabled={!name.trim() || loading}
-        className="w-full py-3 rounded-xl font-black text-base bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-600 hover:to-purple-600 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-all shadow-lg"
+        className="w-full py-3 rounded-xl font-bold text-base bg-gradient-to-r from-amber-800 to-yellow-700 hover:from-amber-700 hover:to-yellow-600 disabled:opacity-30 disabled:cursor-not-allowed text-amber-50 transition-all shadow-lg"
       >
-        {loading ? 'Criando...' : 'Começar Aventura'}
+        {loading ? 'Forjando personagem...' : 'Iniciar Campanha'}
       </button>
+
+      <p className="text-center text-[11px] text-amber-100/45 pb-2">
+        Em breve: ordens avançadas como Paladin, Druid e Sorcerer.
+      </p>
     </div>
   )
 }

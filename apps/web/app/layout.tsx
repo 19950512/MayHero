@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Cinzel, Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  variable: "--font-medieval-title",
+  weight: ["400", "600", "700"],
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-ui",
+});
 
 export const metadata: Metadata = {
   title: "May Hero",
@@ -16,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="h-full">
-      <body className={`${inter.className} h-full bg-slate-950 overflow-hidden`}>{children}</body>
+      <body className={`${cinzel.variable} ${inter.variable} h-full overflow-hidden`}>{children}</body>
     </html>
   );
 }

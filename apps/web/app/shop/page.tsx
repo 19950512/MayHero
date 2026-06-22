@@ -36,7 +36,6 @@ export default function ShopPage() {
   const { user, logout } = useAuthStore()
 
   const load = (p = 1) => {
-    setLoading(true)
     api.shop.list(p)
       .then(r => {
         setListings(r.listings as Listing[])
@@ -64,20 +63,20 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-white/10 bg-slate-900/80 sticky top-0 backdrop-blur z-10">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
+      <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-white font-black text-xl">⚔️ May Hero</Link>
+          <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
           <div className="flex gap-3 text-sm items-center">
-            <Link href="/rankings" className="text-white/50 hover:text-white">🏆 Rankings</Link>
+            <Link href="/rankings" className="text-amber-100/55 hover:text-amber-100">Rankings</Link>
             {user ? (
               <>
-                <Link href="/" className="text-white/50 hover:text-white">⚔️ Jogar</Link>
-                <span className="text-white/30">@{user.username}</span>
-                <button onClick={logout} className="text-white/30 hover:text-white/60">Sair</button>
+                <Link href="/" className="text-amber-100/55 hover:text-amber-100">Jogar</Link>
+                <span className="text-amber-100/35">@{user.username}</span>
+                <button onClick={logout} className="text-amber-100/35 hover:text-amber-100/70">Sair</button>
               </>
             ) : (
-              <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Entrar</Link>
+              <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
             )}
           </div>
         </div>
@@ -85,8 +84,8 @@ export default function ShopPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-black">🛒 Mercado de Itens</h1>
-          <p className="text-white/40 mt-1">{total} itens à venda</p>
+          <h1 className="text-3xl font-bold tracking-[0.08em] text-amber-100">Mercado de Itens</h1>
+          <p className="text-amber-100/55 mt-1">{total} itens à venda</p>
         </div>
 
         {msg && (
@@ -96,9 +95,9 @@ export default function ShopPage() {
         )}
 
         {loading ? (
-          <div className="text-center text-white/30 py-16">Carregando itens...</div>
+          <div className="text-center text-amber-100/35 py-16">Carregando itens...</div>
         ) : listings.length === 0 ? (
-          <div className="text-center text-white/20 py-16">
+          <div className="text-center text-amber-100/30 py-16">
             Nenhum item à venda.<br />
             <span className="text-sm">Jogue para conseguir drops e liste itens!</span>
           </div>
@@ -112,25 +111,25 @@ export default function ShopPage() {
                   .join(', ')
 
                 return (
-                  <div key={listing.id} className="bg-slate-900 rounded-xl p-4 border border-white/10 flex gap-3">
+                  <div key={listing.id} className="bg-[#18120d] rounded-xl p-4 border border-amber-100/15 flex gap-3">
                     <div className="text-3xl w-10 text-center shrink-0">{item.icon}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className={`font-bold text-sm ${RARITY_COLORS[item.rarity] ?? 'text-white'}`}>{item.name}</p>
-                          <p className="text-white/30 text-xs">{SLOT_PT[item.slot] ?? item.slot} • Nível {item.requiredLevel}+</p>
-                          <p className="text-white/40 text-xs mt-0.5 truncate">{bonusText}</p>
+                          <p className="text-amber-100/35 text-xs">{SLOT_PT[item.slot] ?? item.slot} • Nível {item.requiredLevel}+</p>
+                          <p className="text-amber-100/45 text-xs mt-0.5 truncate">{bonusText}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-2">
                         <div>
-                          <p className="text-yellow-400 font-bold text-sm">🪙 {listing.price}</p>
-                          <p className="text-white/20 text-xs">por {listing.seller?.name} Lv{listing.seller?.level}</p>
+                          <p className="text-amber-300 font-bold text-sm">Ouro {listing.price}</p>
+                          <p className="text-amber-100/30 text-xs">por {listing.seller?.name} Lv{listing.seller?.level}</p>
                         </div>
                         <button
                           onClick={() => handleBuy(listing.id)}
                           disabled={buying === listing.id}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white transition-colors"
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-amber-50 transition-colors"
                         >
                           {buying === listing.id ? '...' : 'Comprar'}
                         </button>
@@ -147,8 +146,11 @@ export default function ShopPage() {
                 {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
                   <button
                     key={p}
-                    onClick={() => setPage(p)}
-                    className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${p === page ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-white/50 hover:bg-slate-700'}`}
+                    onClick={() => {
+                      setLoading(true)
+                      setPage(p)
+                    }}
+                    className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${p === page ? 'bg-amber-800 text-amber-50' : 'bg-stone-800 text-amber-100/60 hover:bg-stone-700'}`}
                   >
                     {p}
                   </button>

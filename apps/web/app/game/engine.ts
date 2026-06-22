@@ -76,7 +76,7 @@ export function simulateBattleTick(
   let enemyHp = battle.enemyCurrentHp
   const enemy = battle.enemy!
   const stats = computeStats(hero)
-  let phase: BattleState['phase'] = 'fighting'
+  const phase: BattleState['phase'] = 'fighting'
   const turn = battle.turn + 1
   const mkId = () => `${turn}-${Math.random().toString(36).slice(2, 6)}`
 
@@ -95,7 +95,7 @@ export function simulateBattleTick(
   })
 
   if (enemyHp <= 0) {
-    logs.push({ id: mkId(), turn, actor: 'hero', message: `${enemy.name} foi derrotado! ⚔️` })
+    logs.push({ id: mkId(), turn, actor: 'hero', message: `${enemy.name} foi derrotado!` })
     return { heroHp, enemyHp: 0, logs, phase: 'victory' }
   }
 
@@ -116,7 +116,7 @@ export function simulateBattleTick(
     })
 
     if (heroHp <= 0) {
-      logs.push({ id: mkId(), turn, actor: 'enemy', message: `Você foi derrotado... 💀` })
+      logs.push({ id: mkId(), turn, actor: 'enemy', message: `Você foi derrotado...` })
       return { heroHp: 0, enemyHp, logs, phase: 'defeat' }
     }
   }

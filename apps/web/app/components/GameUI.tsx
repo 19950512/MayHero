@@ -9,14 +9,16 @@ import { BattleScreen } from './BattleScreen'
 import { HeroStats } from './HeroStats'
 import { Inventory } from './Inventory'
 import { ZoneSelector } from './ZoneSelector'
+import { Profile } from './Profile'
 
-type Tab = 'battle' | 'stats' | 'inventory' | 'zones'
+type Tab = 'battle' | 'stats' | 'inventory' | 'zones' | 'profile'
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'battle', label: 'Batalha', icon: '⚔️' },
-  { id: 'stats', label: 'Herói', icon: '🧙' },
-  { id: 'inventory', label: 'Bolsa', icon: '🎒' },
-  { id: 'zones', label: 'Zonas', icon: '🗺️' },
+const TABS: { id: Tab; label: string; sigil: string }[] = [
+  { id: 'battle',  label: 'Confronto', sigil: 'I'   },
+  { id: 'stats',   label: 'Herói',     sigil: 'II'  },
+  { id: 'inventory', label: 'Arsenal', sigil: 'III' },
+  { id: 'zones',   label: 'Reinos',    sigil: 'IV'  },
+  { id: 'profile', label: 'Perfil',    sigil: 'V'   },
 ]
 
 const SYNC_INTERVAL_MS = 30_000
@@ -48,6 +50,8 @@ export function GameUI() {
     if (now - lastSyncRef.current < SYNC_INTERVAL_MS) return
 
     const syncData = {
+      name: hero.name,
+      class: hero.class,
       level: hero.level,
       xp: hero.xp,
       xpToNext: hero.xpToNext,
@@ -86,41 +90,44 @@ export function GameUI() {
     doSync()
   }, [killsInZone, hero, user, inventory, currentZone])
 
-  const isElectron = typeof window !== 'undefined' && (window as any).electronAPI?.isElectron
+  const electronApi = typeof window !== 'undefined'
+    ? (window as Window & { electronAPI?: { isElectron?: boolean; closeWindow?: () => void } }).electronAPI
+    : undefined
+  const isElectron = !!electronApi?.isElectron
   const handleClose = () => {
-    if (isElectron) (window as any).electronAPI.closeWindow()
+    if (isElectron) electronApi?.closeWindow?.()
   }
 
   if (!hero) return null
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 select-none overflow-hidden">
+    <div className="flex flex-col h-screen bg-[radial-gradient(circle_at_top,#3a2b17_0%,#1b140d_30%,#100d08_70%,#0a0907_100%)] text-[var(--parchment)] select-none overflow-hidden">
       {/* Title bar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900/80 border-b border-white/5 drag-region shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-[#1a140f]/90 border-b border-amber-900/40 drag-region shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-white/70 text-xs font-bold tracking-widest">⚔️ MAY HERO</span>
+          <span className="text-amber-200 text-xs font-semibold tracking-[0.2em]">MAY HERO</span>
           {user && (
-            <span className="text-white/20 text-xs">@{user.username}</span>
+            <span className="text-amber-100/40 text-xs">@{user.username}</span>
           )}
         </div>
         <div className="flex items-center gap-2 no-drag">
           {/* Sync indicator */}
           {user && (
-            <span className={`text-xs ${syncStatus === 'syncing' ? 'text-blue-400' : syncStatus === 'ok' ? 'text-green-400' : syncStatus === 'error' ? 'text-red-400' : 'text-white/20'}`}>
-              {syncStatus === 'syncing' ? '↻' : syncStatus === 'ok' ? '✓' : syncStatus === 'error' ? '✗' : '●'}
+            <span className={`text-xs ${syncStatus === 'syncing' ? 'text-amber-300' : syncStatus === 'ok' ? 'text-emerald-300' : syncStatus === 'error' ? 'text-red-300' : 'text-amber-100/30'}`}>
+              {syncStatus === 'syncing' ? 'Sinc...' : syncStatus === 'ok' ? 'Sinc OK' : syncStatus === 'error' ? 'Sinc ERR' : 'Sinc'}
             </span>
           )}
-          <span className="text-yellow-400 text-xs font-bold">🪙 {hero.gold}</span>
+          <span className="text-amber-300 text-xs font-bold">Ouro {hero.gold}</span>
           {!user && (
-            <Link href="/login" className="text-indigo-400 text-xs hover:text-indigo-300">Entrar</Link>
+            <Link href="/login" className="text-amber-200 text-xs hover:text-amber-100">Entrar</Link>
           )}
           {user && (
-            <button onClick={logout} className="text-white/20 text-xs hover:text-white/50">Sair</button>
+            <button onClick={logout} className="text-amber-100/40 text-xs hover:text-amber-100/70">Sair</button>
           )}
           {isElectron && (
             <button
               onClick={handleClose}
-              className="w-5 h-5 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center text-white/50 hover:text-white text-xs transition-colors"
+              className="w-5 h-5 rounded-full bg-amber-100/10 hover:bg-red-700/70 flex items-center justify-center text-amber-100/50 hover:text-amber-50 text-xs transition-colors"
             >
               ×
             </button>
@@ -136,12 +143,12 @@ export function GameUI() {
               key={n.id}
               className={`
                 text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg
-                ${n.type === 'xp' ? 'bg-blue-700/90 text-blue-100' :
-                  n.type === 'gold' ? 'bg-yellow-700/90 text-yellow-100' :
-                  n.type === 'levelup' ? 'bg-purple-700/90 text-purple-100' :
-                  n.type === 'item' ? 'bg-indigo-700/90 text-indigo-100' :
-                  n.type === 'defeat' ? 'bg-red-800/90 text-red-100' :
-                  'bg-slate-700/90 text-white'}
+                ${n.type === 'xp' ? 'bg-blue-900/80 text-blue-100 border border-blue-300/20' :
+                  n.type === 'gold' ? 'bg-amber-900/80 text-amber-100 border border-amber-300/20' :
+                  n.type === 'levelup' ? 'bg-emerald-900/80 text-emerald-100 border border-emerald-300/20' :
+                  n.type === 'item' ? 'bg-stone-800/90 text-stone-100 border border-stone-300/20' :
+                  n.type === 'defeat' ? 'bg-red-900/85 text-red-100 border border-red-300/20' :
+                  'bg-stone-700/90 text-stone-50'}
               `}
             >
               {n.message}
@@ -153,18 +160,19 @@ export function GameUI() {
       {/* Tab content */}
       <div className="flex-1 overflow-hidden p-3">
         <div className="h-full">
-          {activeTab === 'battle' && <BattleScreen />}
-          {activeTab === 'stats' && <HeroStats />}
+          {activeTab === 'battle'    && <BattleScreen />}
+          {activeTab === 'stats'     && <HeroStats />}
           {activeTab === 'inventory' && <Inventory />}
+          {activeTab === 'profile'   && <Profile />}
           {activeTab === 'zones' && (
             <div className="flex flex-col gap-4 h-full overflow-y-auto">
               <ZoneSelector />
               <div className="flex flex-col gap-2 border-t border-white/5 pt-3">
-                <Link href="/rankings" className="text-center py-2 rounded-lg text-xs text-indigo-400/70 hover:text-indigo-400 hover:bg-indigo-900/20 transition-colors">
-                  🏆 Ver Rankings Online
+                <Link href="/rankings" className="text-center py-2 rounded-lg text-xs text-amber-200/70 hover:text-amber-200 hover:bg-amber-900/20 transition-colors">
+                  Ver Tabela de Heróis
                 </Link>
-                <Link href="/shop" className="text-center py-2 rounded-lg text-xs text-yellow-400/70 hover:text-yellow-400 hover:bg-yellow-900/20 transition-colors">
-                  🛒 Mercado de Itens
+                <Link href="/shop" className="text-center py-2 rounded-lg text-xs text-amber-300/70 hover:text-amber-300 hover:bg-amber-950/30 transition-colors">
+                  Mercado de Itens
                 </Link>
                 <button
                   onClick={() => {
@@ -181,18 +189,18 @@ export function GameUI() {
       </div>
 
       {/* Tab bar */}
-      <div className="shrink-0 flex border-t border-white/5 bg-slate-900/80">
+      <div className="shrink-0 flex border-t border-amber-900/40 bg-[#1a140f]/85">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`
               flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors
-              ${activeTab === tab.id ? 'text-white' : 'text-white/30 hover:text-white/60'}
+              ${activeTab === tab.id ? 'text-amber-100' : 'text-amber-100/40 hover:text-amber-100/70'}
             `}
           >
-            <span className="text-base leading-none">{tab.icon}</span>
-            <span className="text-[10px] font-medium">{tab.label}</span>
+            <span className="text-[10px] leading-none tracking-widest">{tab.sigil}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide">{tab.label}</span>
           </button>
         ))}
       </div>

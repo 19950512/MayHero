@@ -3,15 +3,23 @@ import type { Equipment, Zone, HeroClass, Stats } from './types'
 export const XP_CURVE = (level: number) => Math.floor(100 * Math.pow(level, 1.5))
 
 export const BASE_STATS: Record<HeroClass, Stats> = {
-  warrior: { hp: 120, maxHp: 120, mp: 30, maxMp: 30, atk: 12, def: 8, spd: 5, crit: 8 },
-  archer:  { hp: 90,  maxHp: 90,  mp: 50, maxMp: 50, atk: 15, def: 5, spd: 9, crit: 15 },
-  mage:    { hp: 70,  maxHp: 70,  mp: 100, maxMp: 100, atk: 18, def: 3, spd: 6, crit: 10 },
+  // Classic trio
+  warrior: { hp: 120, maxHp: 120, mp: 30,  maxMp: 30,  atk: 12, def: 8,  spd: 5, crit: 8  },
+  archer:  { hp: 90,  maxHp: 90,  mp: 50,  maxMp: 50,  atk: 15, def: 5,  spd: 9, crit: 15 },
+  mage:    { hp: 70,  maxHp: 70,  mp: 100, maxMp: 100, atk: 18, def: 3,  spd: 6, crit: 10 },
+  // Medieval orders
+  knight:  { hp: 145, maxHp: 145, mp: 20,  maxMp: 20,  atk: 10, def: 12, spd: 4, crit: 6  },
+  paladin: { hp: 105, maxHp: 105, mp: 70,  maxMp: 70,  atk: 13, def: 9,  spd: 6, crit: 9  },
+  druid:   { hp: 80,  maxHp: 80,  mp: 120, maxMp: 120, atk: 14, def: 5,  spd: 7, crit: 12 },
 }
 
 export const LEVEL_STAT_GROWTH: Record<HeroClass, Partial<Stats>> = {
   warrior: { maxHp: 18, atk: 2.5, def: 1.5, spd: 0.3, crit: 0.2 },
   archer:  { maxHp: 12, atk: 3.2, def: 1.0, spd: 0.5, crit: 0.4 },
   mage:    { maxHp: 8,  atk: 4.0, def: 0.8, spd: 0.3, crit: 0.3 },
+  knight:  { maxHp: 22, atk: 2.0, def: 2.0, spd: 0.2, crit: 0.1 },
+  paladin: { maxHp: 16, atk: 2.8, def: 1.4, spd: 0.3, crit: 0.2 },
+  druid:   { maxHp: 10, atk: 3.5, def: 0.9, spd: 0.4, crit: 0.35 },
 }
 
 export const ZONES: Zone[] = [
@@ -93,7 +101,10 @@ export const RARITY_COLORS: Record<Equipment['rarity'], string> = {
 }
 
 export const CLASS_ICONS: Record<string, string> = {
-  warrior: '⚔️',
-  archer: '🏹',
-  mage: '🔮',
+  warrior: 'GU',
+  archer:  'AR',
+  mage:    'MA',
+  knight:  'KN',
+  paladin: 'PA',
+  druid:   'DR',
 }

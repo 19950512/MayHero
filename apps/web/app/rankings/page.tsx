@@ -23,6 +23,15 @@ const ZONE_NAMES: Record<number, string> = {
   3: 'Torre do Mago Sombrio',
 }
 
+const CLASS_NAMES: Record<string, string> = {
+  warrior: 'Guerreiro',
+  archer:  'Arqueiro',
+  mage:    'Sorcerer',
+  knight:  'Knight',
+  paladin: 'Paladin',
+  druid:   'Druid',
+}
+
 export default function RankingsPage() {
   const [tab, setTab] = useState<'level' | 'kills'>('level')
   const [rankings, setRankings] = useState<RankHero[]>([])
@@ -30,7 +39,6 @@ export default function RankingsPage() {
   const { user, logout } = useAuthStore()
 
   useEffect(() => {
-    setLoading(true)
     const fetcher = tab === 'level' ? api.rankings.byLevel : api.rankings.byKills
     fetcher()
       .then(r => setRankings(r.rankings as RankHero[]))
@@ -38,24 +46,24 @@ export default function RankingsPage() {
       .finally(() => setLoading(false))
   }, [tab])
 
-  const medals = ['🥇', '🥈', '🥉']
+  const medals = ['I', 'II', 'III']
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
       {/* Header */}
-      <header className="border-b border-white/10 bg-slate-900/80 sticky top-0 backdrop-blur z-10">
+      <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-white font-black text-xl">⚔️ May Hero</Link>
+          <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
           <div className="flex gap-3 text-sm items-center">
-            <Link href="/shop" className="text-white/50 hover:text-white">🛒 Shop</Link>
+            <Link href="/shop" className="text-amber-100/55 hover:text-amber-100">Mercado</Link>
             {user ? (
               <>
-                <Link href="/" className="text-white/50 hover:text-white">⚔️ Jogar</Link>
-                <span className="text-white/30">@{user.username}</span>
-                <button onClick={logout} className="text-white/30 hover:text-white/60">Sair</button>
+                <Link href="/" className="text-amber-100/55 hover:text-amber-100">Jogar</Link>
+                <span className="text-amber-100/35">@{user.username}</span>
+                <button onClick={logout} className="text-amber-100/35 hover:text-amber-100/70">Sair</button>
               </>
             ) : (
-              <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Entrar</Link>
+              <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
             )}
           </div>
         </div>
@@ -63,32 +71,35 @@ export default function RankingsPage() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-white">🏆 Rankings</h1>
-          <p className="text-white/40 mt-1">Os heróis mais poderosos de May Hero</p>
+          <h1 className="text-3xl font-bold text-amber-100 tracking-[0.08em]">Tabela de Heróis</h1>
+          <p className="text-amber-100/55 mt-1">Registro oficial dos campeões de May Hero</p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex bg-slate-900 rounded-xl p-1 mb-6 border border-white/10">
+        <div className="flex bg-[#1d150f] rounded-xl p-1 mb-6 border border-amber-800/40">
           {(['level', 'kills'] as const).map(t => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setLoading(true)
+                setTab(t)
+              }}
               className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${
-                tab === t ? 'bg-indigo-700 text-white' : 'text-white/40 hover:text-white/70'
+                tab === t ? 'bg-amber-800 text-amber-50' : 'text-amber-100/45 hover:text-amber-100/75'
               }`}
             >
-              {t === 'level' ? '⬆️ Por Nível' : '⚔️ Por Abates'}
+              {t === 'level' ? 'Por Nível' : 'Por Abates'}
             </button>
           ))}
         </div>
 
         {/* Rankings list */}
         {loading ? (
-          <div className="text-center text-white/30 py-16">Carregando...</div>
+          <div className="text-center text-amber-100/35 py-16">Carregando...</div>
         ) : rankings.length === 0 ? (
-          <div className="text-center text-white/20 py-16">
+          <div className="text-center text-amber-100/30 py-16">
             Nenhum herói ranqueado ainda.<br />
-            <Link href="/register" className="text-indigo-400 hover:text-indigo-300 mt-2 inline-block">Seja o primeiro!</Link>
+            <Link href="/register" className="text-amber-300 hover:text-amber-200 mt-2 inline-block">Seja o primeiro!</Link>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -97,35 +108,35 @@ export default function RankingsPage() {
                 key={hero.id}
                 className={`
                   flex items-center gap-4 p-4 rounded-xl border transition-colors
-                  ${i === 0 ? 'bg-yellow-900/20 border-yellow-500/30' :
-                    i === 1 ? 'bg-slate-800/60 border-slate-500/30' :
-                    i === 2 ? 'bg-orange-900/10 border-orange-700/20' :
-                    'bg-slate-900/40 border-white/5'}
+                  ${i === 0 ? 'bg-amber-900/25 border-amber-500/40' :
+                    i === 1 ? 'bg-stone-700/35 border-stone-400/30' :
+                    i === 2 ? 'bg-orange-900/20 border-orange-700/30' :
+                    'bg-stone-900/45 border-amber-100/10'}
                 `}
               >
                 <div className="w-8 text-center">
                   {i < 3 ? (
-                    <span className="text-xl">{medals[i]}</span>
+                    <span className="text-sm tracking-widest text-amber-100/90">{medals[i]}</span>
                   ) : (
-                    <span className="text-white/30 font-bold text-sm">#{i + 1}</span>
+                    <span className="text-amber-100/35 font-bold text-sm">#{i + 1}</span>
                   )}
                 </div>
 
-                <div className="text-2xl">{CLASS_ICONS[hero.class] ?? '⚔️'}</div>
+                <div className="w-9 h-9 rounded-full border border-amber-200/35 bg-amber-900/25 flex items-center justify-center text-[10px] tracking-widest font-bold text-amber-50">{CLASS_ICONS[hero.class] ?? 'HR'}</div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-white truncate">{hero.name}</p>
-                    <span className="text-white/30 text-xs">@{hero.user?.username}</span>
+                    <p className="font-bold text-amber-100 truncate tracking-wide">{hero.name}</p>
+                    <span className="text-amber-100/35 text-xs">@{hero.user?.username}</span>
                   </div>
-                  <p className="text-white/40 text-xs capitalize">
-                    {hero.class} • {ZONE_NAMES[hero.currentZone] ?? `Zona ${hero.currentZone}`}
+                  <p className="text-amber-100/45 text-xs">
+                    {CLASS_NAMES[hero.class] ?? hero.class} • {ZONE_NAMES[hero.currentZone] ?? `Zona ${hero.currentZone}`}
                   </p>
                 </div>
 
                 <div className="text-right shrink-0">
-                  <p className="text-white font-bold">Nível {hero.level}</p>
-                  <p className="text-white/40 text-xs">
+                  <p className="text-amber-100 font-bold">Nível {hero.level}</p>
+                  <p className="text-amber-100/45 text-xs">
                     {tab === 'level' ? `${hero.totalKills} abates` : `${hero.totalKills} abates`}
                   </p>
                 </div>
