@@ -1,0 +1,85 @@
+services:
+
+  # ─── Database ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mayhero-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mayhero
+      POSTGRES_USER: mayhero
+      POSTGRES_PASSWORD: mayhero_dev
+    # Sem exposição ao host — acesso apenas interno via rede Docker
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mayhero"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Cache / Leaderboard ─────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mayhero-redis
+    restart: unless-stopped
+    # Sem exposição ao host — acesso apenas interno via rede Docker
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── API (Fastify + Prisma) ───────────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    container_name: mayhero-api
+    restart: unless-stopped
+    ports:
+      - "3070:3070"
+    environment:
+      NODE_ENV: development
+      PORT: "3070"
+      DATABASE_URL: "postgresql://mayhero:mayhero_dev@postgres:5432/mayhero"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: "mayhero-dev-secret-change-in-prod"
+      WEB_URL: "http://localhost:3069"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src:ro
+      - ./apps/api/prisma:/app/prisma:ro
+
+  # ─── Web (Next.js) ───────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    container_name: mayhero-web
+    restart: unless-stopped
+    ports:
+      - "3069:3069"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: "http://localhost:3070"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web/app:/app/app:ro
+      - ./apps/web/public:/app/public:ro
+
+volumes:
+  postgres_data:
+  redis_data:

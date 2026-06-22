@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hero      Hero?
+}
+
+model Hero {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  class         String
+  level         Int       @default(1)
+  xp            Int       @default(0)
+  xpToNext      Int       @default(100)
+  gold          Int       @default(0)
+  totalKills    Int       @default(0)
+  skillPoints   Int       @default(0)
+  currentZone   Int       @default(1)
+  statsJson     Json
+  baseStatsJson Json
+  equipJson     Json
+  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+  inventory     InventoryItem[]
+  listingsAsSeller ShopListing[] @relation("SellerHero")
+  purchasesAsBuyer ShopListing[] @relation("BuyerHero")
+}
+
+model InventoryItem {
+  id       String       @id @default(cuid())
+  heroId   String
+  hero     Hero         @relation(fields: [heroId], references: [id], onDelete: Cascade)
+  itemData Json
+  listing  ShopListing?
+  createdAt DateTime    @default(now())
+}
+
+model ShopListing {
+  id              String        @id @default(cuid())
+  sellerId        String
+  seller          Hero          @relation("SellerHero", fields: [sellerId], references: [id])
+  buyerId         String?
+  buyer           Hero?         @relation("BuyerHero", fields: [buyerId], references: [id])
+  inventoryItemId String        @unique
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  itemData        Json
+  price           Int
+  createdAt       DateTime      @default(now())
+  soldAt          DateTime?
+}

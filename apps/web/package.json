@@ -1,0 +1,54 @@
+{
+  "name": "@mayhero/web",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "next dev -p 3069",
+    "build": "next build",
+    "start": "next start -p 3069",
+    "lint": "eslint",
+    "electron": "electron . --no-sandbox",
+    "electron:dev": "concurrently \"next dev -p 3069\" \"wait-on http://localhost:3069 && electron . --no-sandbox\"",
+    "electron:build": "ELECTRON_BUILD=true next build && electron-builder"
+  },
+  "dependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-store": "^11.0.2",
+    "framer-motion": "^12.40.0",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.3",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.mayhero.app",
+    "productName": "May Hero",
+    "files": [
+      "electron/**/*",
+      "out/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

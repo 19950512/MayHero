@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+apps/web/.next
+apps/web/node_modules/
+
 # next.js
 /.next/
 /out/

@@ -1,0 +1,19 @@
+FROM node:20
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy config files
+COPY next.config.ts postcss.config.mjs tsconfig.json ./
+COPY eslint.config.mjs ./
+
+# Copy public and app source (volumes override in dev)
+COPY public ./public
+COPY app ./app
+
+EXPOSE 3069
+
+CMD ["npm", "run", "dev"]
