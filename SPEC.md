@@ -2,7 +2,7 @@
 
 > **Status:** Em desenvolvimento ativo  
 > **Stack:** Next.js 16 + Fastify 5 + PostgreSQL + Redis + Electron  
-> **Versão atual:** 0.3.0
+> **Versão atual:** 0.3.4
 
 ---
 
@@ -244,22 +244,41 @@ Dois rankings públicos (sem precisar de login):
 
 ## 8. Sistema Online
 
+> Ver detalhes de análise de ameaças e mitigação em `SECURITY.md`.
+
 ### Contas
 - Registro: `username` (3–20 chars, alphanumeric+underscore) + email + senha
 - Login via JWT com **expiração de 7 dias**
-- Sessão salva no `localStorage`
+- Sessão autenticada por **cookie HttpOnly** (`SameSite=Lax`, `Secure` em produção)
+- Endpoint de logout disponível para limpeza de sessão server-side
 
 ### Sincronização
 - O jogo roda **client-side** (no browser/Electron)
 - A cada **30 segundos** ou a cada mudança de `killsInZone`, o estado é enviado para a API
 - Indicadores no header: `↻` (sinc), `✓` (ok), `✗` (erro)
 - Se o herói não existir na API ainda, ele é criado automaticamente na primeira sync
-- Anti-cheat básico: rejeita se o nível subir mais de 5 por sync
+- Anti-cheat atual: `/hero/sync` não aceita mutação de progressão (level/xp/gold/skill points/totalKills/classe), valida equipamento canônico e não sobrescreve inventário server-owned
+
+### Batalha online autoritativa (parcial)
+- Em sessão autenticada, o cliente inicia encontro via `POST /hero/battle/start`.
+- A API retorna `encounterId` e `enemyId` válidos para a zona/estado atual.
+- A vitória só é aceita em `POST /hero/battle/victory` quando o `encounterId` bate com o encontro ativo.
+- Recompensas (XP, ouro, level, skill points e drops) seguem sendo aplicadas exclusivamente no servidor.
 - O cliente já envia também o estado de stackáveis; persistência server-side completa ainda pendente
+- Hardening atual no backend:
+	- validação de `xpToNext` pela curva oficial
+	- validação de faixa de XP por nível
+	- bloqueio de troca de classe via sync
+	- sanitização canônica de equipamento/inventário por catálogo oficial
+	- limites de delta para ouro/abates/skill points
+- Recompensas de vitória online agora são **autoritativas no servidor** (`POST /hero/battle/victory`)
+- Inventário deixou de ser sobrescrito por `/hero/sync` e passa a ser **propriedade do servidor**
 
 ### Rate Limiting
-- **100 req/min por IP** — respostas com `HTTP 429` e header `Retry-After: 60`
-- Implementado como hook `onRequest` em memória
+- Implementado com **Redis** por bucket de rota (janela de 1 minuto), com fallback em memória
+- Chave de limitação usa fingerprint `IP + User-Agent`
+- Buckets dedicados para rotas sensíveis (`auth`, `sync`, `buy`)
+- Respostas com `HTTP 429` e `Retry-After: 60`
 
 ### Offline
 - Funciona sem conta — salvo apenas no `localStorage`
@@ -307,7 +326,7 @@ Dois rankings públicos (sem precisar de login):
 - [ ] Sem cap de ouro — jogador pode acumular infinitamente
 
 ### Online / Multiplayer
-- [ ] **Anti-cheat fraco** — apenas valida delta de nível, não valida XP/ouro
+- [ ] **Anti-cheat ainda parcial** — vitória/recompensa online já é autoritativa, porém simulação completa de combate ainda inicia no cliente
 - [ ] **WebSocket subutilizado** — implementado mas não usado no frontend (rankings em tempo real)
 - [ ] **Persistência server-side de stackáveis** — payload já é enviado, falta salvar/recuperar no backend
 - [ ] **Party/Grupo** — cooperação entre jogadores
@@ -322,11 +341,12 @@ Dois rankings públicos (sem precisar de login):
 
 ### Infra / Técnico
 - [ ] **Migrations Prisma** — usando `db push` em dev, falta criar migrations formais para produção
-- [ ] **Rate limiting persistente** — atual é in-memory (perde ao reiniciar); produção precisa de Redis
+- [ ] **Rate limiting adaptativo** — Redis já implementado; falta política por usuário/risco e observabilidade dedicada
 - [ ] **Testes automatizados** — sem nenhum teste unitário ou de integração
 - [ ] **CI/CD** — sem pipeline configurado
 - [ ] **Dockerfile de produção** — só existe `Dockerfile.dev` com `tsx watch`
 - [ ] **`NEXT_PUBLIC_API_URL`** — hardcoded `localhost:3070`; SSR precisaria do nome interno do serviço Docker
+- [ ] **CSRF hardening completo** — sessão em cookie HttpOnly já implementada; faltam defesas CSRF explícitas para rotas mutáveis
 
 ### UX
 - [ ] **Animações de combate** — sprites se movendo na arena
@@ -339,6 +359,33 @@ Dois rankings públicos (sem precisar de login):
 ---
 
 ## Histórico de versões
+
+### v0.3.3
+- Autoridade de progressão reforçada para sessões online:
+	- endpoint autoritativo de vitória (`/hero/battle/victory`) calcula e persiste XP/ouro/level/drops no servidor
+	- validação de zona/inimigo e cadência de boss com contador server-side (Redis)
+	- `/hero/sync` não sobrescreve mais inventário (modelo server-owned para itens)
+- Documentação de segurança atualizada com modelo autoritativo parcial e limites atuais
+
+### v0.3.2
+- Segurança e proteção contra bots reforçadas:
+	- migração de auth no frontend para `credentials: include`
+	- sessão por cookie HttpOnly no backend (`/auth/login`, `/auth/register`, `/auth/logout`)
+	- `authenticate` aceitando Bearer/cookie (modo compatibilidade)
+	- rate limiting principal em Redis com fallback em memória
+	- buckets por rota para limites diferentes (`auth`, `sync`, `buy`, `default`)
+	- lock temporário por conta após múltiplas falhas de login (anti-bruteforce)
+- Documentação de segurança atualizada em `SECURITY.md`
+
+### v0.3.1
+- Hardening de segurança inicial no backend:
+	- catálogo canônico de itens/classes no servidor
+	- validação e sanitização de equipamento/inventário no `/hero/sync`
+	- validação adicional anti-cheat para XP/nível/skill points/ouro/abates
+	- rejeição de item inválido no anúncio de shop
+	- exigência de `JWT_SECRET` forte em produção
+	- melhoria incremental do rate limit (chave IP + User-Agent)
+- Documento de segurança adicionado: `SECURITY.md`
 
 ### v0.3.0
 - Refatoração de dados do jogo para estrutura modular por domínio:

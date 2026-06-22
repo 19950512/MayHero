@@ -2,6 +2,63 @@ import type { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '../db.js'
+import { redis } from '../redis.js'
+
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'mayhero_token'
+const isProd = process.env.NODE_ENV === 'production'
+
+function setAuthCookie(reply: { setCookie: Function }, token: string) {
+  reply.setCookie(AUTH_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7,
+  })
+}
+
+function clearAuthCookie(reply: { clearCookie: Function }) {
+  reply.clearCookie(AUTH_COOKIE_NAME, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+  })
+}
+
+const LOGIN_FAIL_WINDOW_SEC = 15 * 60
+const LOGIN_LOCK_WINDOW_SEC = 15 * 60
+const LOGIN_FAIL_THRESHOLD = 8
+
+async function isAccountLocked(email: string): Promise<boolean> {
+  try {
+    const locked = await redis.get(`auth:lock:${email}`)
+    return locked === '1'
+  } catch {
+    return false
+  }
+}
+
+async function registerFailedLogin(email: string): Promise<void> {
+  try {
+    const failKey = `auth:fail:${email}`
+    const fails = await redis.incr(failKey)
+    if (fails === 1) await redis.expire(failKey, LOGIN_FAIL_WINDOW_SEC)
+    if (fails >= LOGIN_FAIL_THRESHOLD) {
+      await redis.set(`auth:lock:${email}`, '1', 'EX', LOGIN_LOCK_WINDOW_SEC)
+    }
+  } catch {
+    // If Redis is unavailable, keep auth flow functional.
+  }
+}
+
+async function clearFailedLogin(email: string): Promise<void> {
+  try {
+    await redis.del(`auth:fail:${email}`, `auth:lock:${email}`)
+  } catch {
+    // no-op
+  }
+}
 
 const RegisterBody = z.object({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/),
@@ -19,7 +76,8 @@ export async function authRoutes(app: FastifyInstance) {
     const body = RegisterBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ error: body.error.issues[0].message })
 
-    const { username, email, password } = body.data
+    const { username, password } = body.data
+    const email = body.data.email.toLowerCase()
 
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
@@ -33,6 +91,7 @@ export async function authRoutes(app: FastifyInstance) {
     })
 
     const token = app.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '7d' })
+    setAuthCookie(reply as any, token)
     return { token, user }
   })
 
@@ -41,15 +100,34 @@ export async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ error: 'Dados inválidos.' })
 
     const { email, password } = body.data
+    const normalizedEmail = email.toLowerCase()
 
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) return reply.status(401).send({ error: 'Credenciais inválidas.' })
+    if (await isAccountLocked(normalizedEmail)) {
+      return reply.status(429).send({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } })
+    if (!user) {
+      await registerFailedLogin(normalizedEmail)
+      return reply.status(401).send({ error: 'Credenciais inválidas.' })
+    }
 
     const valid = await bcrypt.compare(password, user.password)
-    if (!valid) return reply.status(401).send({ error: 'Credenciais inválidas.' })
+    if (!valid) {
+      await registerFailedLogin(normalizedEmail)
+      return reply.status(401).send({ error: 'Credenciais inválidas.' })
+    }
+
+    await clearFailedLogin(normalizedEmail)
 
     const token = app.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '7d' })
+    setAuthCookie(reply as any, token)
     return { token, user: { id: user.id, username: user.username, email: user.email } }
+  })
+
+  app.post('/auth/logout', async (_req, reply) => {
+    clearAuthCookie(reply as any)
+    return { ok: true }
   })
 
   app.get('/auth/me', { onRequest: [app.authenticate] }, async (req) => {

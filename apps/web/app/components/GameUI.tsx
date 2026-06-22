@@ -27,9 +27,26 @@ export function GameUI() {
   const [activeTab, setActiveTab] = useState<Tab>('battle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
   const [showNotifications, setShowNotifications] = useState(true)
-  const { hero, tick, notifications, dismissNotification, resetGame, inventory, stackableInventory, currentZone, killsInZone } = useGameStore()
+  const {
+    hero,
+    battle,
+    tick,
+    notifications,
+    dismissNotification,
+    resetGame,
+    inventory,
+    stackableInventory,
+    currentZone,
+    killsInZone,
+    battleEncounterId,
+    setServerAuthoritativeRewards,
+    startServerEncounter,
+    applyServerVictoryResolution,
+  } = useGameStore()
   const { user, logout } = useAuthStore()
   const lastSyncRef = useRef<number>(0)
+  const lastVictoryKeyRef = useRef<string | null>(null)
+  const battleStartPendingRef = useRef(false)
 
   const runTick = useCallback(() => { tick() }, [tick])
   useEffect(() => {
@@ -37,12 +54,89 @@ export function GameUI() {
     return () => clearInterval(interval)
   }, [runTick])
 
+  useEffect(() => {
+    setServerAuthoritativeRewards(!!user)
+  }, [user, setServerAuthoritativeRewards])
+
+  useEffect(() => {
+    // On refresh, persisted user may be stale; validate session with backend.
+    api.auth.me().then((me) => {
+      if (!me && user) {
+        logout().catch(() => undefined)
+      }
+    }).catch(() => {
+      // Ignore startup connectivity hiccups.
+    })
+  }, [user, logout])
+
   // Auto-dismiss notifications
   useEffect(() => {
     if (notifications.length === 0) return
     const t = setTimeout(() => dismissNotification(notifications[0].id), 3000)
     return () => clearTimeout(t)
   }, [notifications, dismissNotification])
+
+  // Server-authoritative rewards for online battles.
+  useEffect(() => {
+    if (!user || !hero) return
+    if (battle.phase !== 'victory' || !battle.enemy) return
+    if (!battleEncounterId) return
+
+    const key = `${battle.turn}:${battle.enemy.id}:${killsInZone}`
+    if (lastVictoryKeyRef.current === key) return
+    lastVictoryKeyRef.current = key
+
+    api.hero.battleVictory({
+      encounterId: battleEncounterId,
+      enemyId: battle.enemy.id,
+      currentZone,
+      heroHpAfterBattle: hero.stats.hp,
+    }).then(result => {
+      applyServerVictoryResolution({
+        hero: {
+          ...result.hero,
+          stats: result.hero.stats,
+          baseStats: result.hero.baseStats,
+        },
+        rewards: {
+          ...result.rewards,
+          itemDrop: result.rewards.itemDrop,
+          stackableDrops: result.rewards.stackableDrops,
+        },
+        serverState: result.serverState,
+      })
+    }).catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.toLowerCase().includes('não autorizado') || msg.toLowerCase().includes('unauthorized')) {
+        setServerAuthoritativeRewards(false)
+      }
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 3000)
+    })
+  }, [user, hero, battle.phase, battle.turn, battle.enemy, battleEncounterId, currentZone, killsInZone, applyServerVictoryResolution, setServerAuthoritativeRewards])
+
+  // In online mode, each fight must start from a server-issued encounter.
+  useEffect(() => {
+    if (!user || !hero) return
+    if (battle.phase !== 'idle') return
+    if (battleStartPendingRef.current) return
+    if (battleEncounterId) return
+
+    battleStartPendingRef.current = true
+    api.hero.battleStart({ currentZone })
+      .then(({ encounterId, enemyId }) => {
+        startServerEncounter({ encounterId, enemyId })
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : ''
+        if (msg.toLowerCase().includes('não autorizado') || msg.toLowerCase().includes('unauthorized')) {
+          setServerAuthoritativeRewards(false)
+        }
+      })
+      .finally(() => {
+        battleStartPendingRef.current = false
+      })
+  }, [user, hero, battle.phase, battleEncounterId, currentZone, startServerEncounter, setServerAuthoritativeRewards])
 
   // Auto-sync to API
   useEffect(() => {
@@ -91,7 +185,7 @@ export function GameUI() {
         .finally(() => setTimeout(() => setSyncStatus('idle'), 3000))
 
     doSync()
-  }, [killsInZone, hero, user, inventory, stackableInventory, currentZone])
+  }, [hero, user, inventory, stackableInventory, currentZone])
 
   const electronApi = typeof window !== 'undefined'
     ? (window as Window & { electronAPI?: { isElectron?: boolean; closeWindow?: () => void } }).electronAPI

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../db.js'
+import { normalizeEquipmentItemData } from '../game-catalog.js'
 
 const ListItemBody = z.object({
   inventoryItemId: z.string(),
@@ -48,6 +49,11 @@ export async function shopRoutes(app: FastifyInstance) {
     })
     if (!item) return reply.status(404).send({ error: 'Item não encontrado no inventário.' })
 
+    const canonicalItem = normalizeEquipmentItemData(item.itemData)
+    if (!canonicalItem) {
+      return reply.status(400).send({ error: 'Item inválido para anúncio.' })
+    }
+
     // Ensure not already listed
     const existing = await prisma.shopListing.findFirst({
       where: { inventoryItemId: item.id, soldAt: null },
@@ -58,7 +64,7 @@ export async function shopRoutes(app: FastifyInstance) {
       data: {
         sellerId: hero.id,
         inventoryItemId: item.id,
-        itemData: item.itemData as object,
+        itemData: canonicalItem as object,
         price: body.data.price,
       },
     })

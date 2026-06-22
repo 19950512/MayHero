@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Hero, BattleState, Equipment } from '../game/types'
-import { ZONES } from '../game/data'
+import { ZONES, MONSTER_BY_ID } from '../game/data'
 import {
   createHero,
   pickEnemy,
@@ -32,6 +32,8 @@ interface GameState {
   stackableInventory: Record<string, number>
   notifications: Notification[]
   autoFight: boolean
+  serverAuthoritativeRewards: boolean
+  battleEncounterId: string | null
   gameStarted: boolean
   killsInZone: number
 
@@ -47,6 +49,30 @@ interface GameState {
   spendSkillPoint: (stat: SkillAllocStat) => void
   renameHero: (newName: string) => void
   setHeroMessage: (message: string) => void
+  setServerAuthoritativeRewards: (enabled: boolean) => void
+  startServerEncounter: (payload: { encounterId: string; enemyId: string }) => void
+  applyServerVictoryResolution: (payload: {
+    hero: {
+      level: number
+      xp: number
+      xpToNext: number
+      gold: number
+      totalKills: number
+      skillPoints: number
+      stats: Hero['stats']
+      baseStats: Hero['baseStats']
+    }
+    rewards: {
+      xpEarned: number
+      goldEarned: number
+      leveledUp: boolean
+      itemDrop?: Equipment
+      stackableDrops: Array<{ itemId: string; name: string; quantity: number }>
+    }
+    serverState: {
+      killsInZone: number
+    }
+  }) => void
 }
 
 const IDLE_BATTLE_STATE: BattleState = {
@@ -73,6 +99,8 @@ export const useGameStore = create<GameState>()(
       stackableInventory: {},
       notifications: [],
       autoFight: true,
+      serverAuthoritativeRewards: false,
+      battleEncounterId: null,
       gameStarted: false,
       killsInZone: 0,
 
@@ -88,6 +116,8 @@ export const useGameStore = create<GameState>()(
           inventory: [],
           stackableInventory: {},
           notifications: [],
+          serverAuthoritativeRewards: false,
+          battleEncounterId: null,
         })
       },
 
@@ -100,6 +130,22 @@ export const useGameStore = create<GameState>()(
 
         // Start new fight if idle
         if (battle.phase === 'idle' || battle.phase === 'victory' || battle.phase === 'defeat') {
+          if (get().serverAuthoritativeRewards) {
+            if (battle.phase === 'defeat') {
+              const healed = applyDefeat(hero)
+              set({
+                hero: healed,
+                battle: {
+                  ...IDLE_BATTLE_STATE,
+                  logs: [{ id: 'recover', turn: battle.turn, actor: 'hero', message: 'Você recua para se recuperar.' }],
+                  lastTickAt: now,
+                },
+                battleEncounterId: null,
+              })
+            }
+            return
+          }
+
           if (battle.phase === 'defeat') {
             const healed = applyDefeat(hero)
             const enemy = pickEnemy(currentZone, killsInZone)
@@ -139,6 +185,21 @@ export const useGameStore = create<GameState>()(
           const newLogs = [...battle.logs, ...result.logs].slice(-MAX_LOGS)
 
           if (result.phase === 'victory') {
+            if (get().serverAuthoritativeRewards) {
+              set({
+                hero: { ...hero, stats: { ...hero.stats, hp: result.heroHp } },
+                battle: {
+                  ...battle,
+                  enemyCurrentHp: 0,
+                  turn: battle.turn + 1,
+                  logs: newLogs,
+                  phase: 'victory',
+                  lastTickAt: now,
+                },
+              })
+              return
+            }
+
             const { hero: updatedHero, goldEarned, xpEarned, leveledUp, itemDrop, stackableDrops } = applyVictory(hero, battle.enemy)
             const newNotifs: Notification[] = [
               { id: `xp-${now}`, message: `+${xpEarned} XP`, type: 'xp' },
@@ -214,7 +275,7 @@ export const useGameStore = create<GameState>()(
         const { hero } = get()
         const zone = ZONES.find(z => z.id === zoneId)
         if (!zone || !hero || hero.level < zone.minLevel) return
-        set({ currentZone: zoneId, killsInZone: 0, battle: IDLE_BATTLE_STATE })
+        set({ currentZone: zoneId, killsInZone: 0, battle: IDLE_BATTLE_STATE, battleEncounterId: null })
       },
 
       equipItemFromInventory: (item) => {
@@ -266,6 +327,78 @@ export const useGameStore = create<GameState>()(
         set({ heroMessage: normalized })
       },
 
+      setServerAuthoritativeRewards: (enabled) => {
+        set({ serverAuthoritativeRewards: enabled, battleEncounterId: null })
+      },
+
+      startServerEncounter: ({ encounterId, enemyId }) => {
+        const enemy = MONSTER_BY_ID[enemyId]
+        if (!enemy) return
+        const now = Date.now()
+        set({
+          battle: {
+            active: true,
+            enemy: { ...enemy },
+            enemyCurrentHp: enemy.stats.maxHp,
+            turn: 0,
+            logs: [{ id: `start-${encounterId}`, turn: 0, actor: 'hero', message: `${enemy.isBoss ? 'CHEFE! ' : ''}Você enfrenta ${enemy.name}!` }],
+            phase: 'fighting',
+            lastTickAt: now,
+          },
+          battleEncounterId: encounterId,
+        })
+      },
+
+      applyServerVictoryResolution: (payload) => {
+        const { hero, inventory, stackableInventory, notifications } = get()
+        if (!hero) return
+
+        const now = Date.now()
+        const newInventory = [...inventory]
+        const newStackableInventory = { ...stackableInventory }
+        const newNotifs: Notification[] = [
+          { id: `xp-${now}`, message: `+${payload.rewards.xpEarned} XP`, type: 'xp' },
+          { id: `gold-${now}`, message: `+${payload.rewards.goldEarned} ouro`, type: 'gold' },
+        ]
+
+        if (payload.rewards.leveledUp) {
+          newNotifs.push({ id: `lvl-${now}`, message: `Nível ${payload.hero.level}!`, type: 'levelup' })
+        }
+
+        if (payload.rewards.itemDrop) {
+          newInventory.push(payload.rewards.itemDrop)
+          newNotifs.push({ id: `item-eq-${now}`, message: `Drop: ${payload.rewards.itemDrop.name}`, type: 'item' })
+        }
+
+        for (const stackDrop of payload.rewards.stackableDrops) {
+          newStackableInventory[stackDrop.itemId] = (newStackableInventory[stackDrop.itemId] ?? 0) + stackDrop.quantity
+          newNotifs.push({ id: `item-${now}-${stackDrop.itemId}`, message: `Drop: ${stackDrop.name} x${stackDrop.quantity}`, type: 'item' })
+        }
+
+        set({
+          hero: {
+            ...hero,
+            level: payload.hero.level,
+            xp: payload.hero.xp,
+            xpToNext: payload.hero.xpToNext,
+            gold: payload.hero.gold,
+            totalKills: payload.hero.totalKills,
+            skillPoints: payload.hero.skillPoints,
+            stats: payload.hero.stats,
+            baseStats: payload.hero.baseStats,
+          },
+          killsInZone: payload.serverState.killsInZone,
+          battleEncounterId: null,
+          inventory: newInventory,
+          stackableInventory: newStackableInventory,
+          notifications: [...notifications, ...newNotifs].slice(-5),
+          battle: {
+            ...IDLE_BATTLE_STATE,
+            lastTickAt: now,
+          },
+        })
+      },
+
       resetGame: () =>
         set({
           hero: null,
@@ -276,6 +409,8 @@ export const useGameStore = create<GameState>()(
           stackableInventory: {},
           notifications: [],
           autoFight: true,
+          serverAuthoritativeRewards: false,
+          battleEncounterId: null,
           gameStarted: false,
           killsInZone: 0,
         }),
@@ -292,6 +427,7 @@ export const useGameStore = create<GameState>()(
         gameStarted: state.gameStarted,
         killsInZone: state.killsInZone,
         autoFight: state.autoFight,
+        serverAuthoritativeRewards: state.serverAuthoritativeRewards,
       }),
     }
   )

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { api, saveToken, clearToken } from '../lib/api'
+import { api } from '../lib/api'
 
 interface AuthUser {
   id: string
@@ -12,12 +12,11 @@ interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null
-  token: string | null
   loading: boolean
   error: string | null
   login: (email: string, password: string) => Promise<void>
   register: (username: string, email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   clearError: () => void
 }
 
@@ -25,7 +24,6 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
       loading: false,
       error: null,
 
@@ -33,8 +31,10 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true, error: null })
         try {
           const { token, user } = await api.auth.login(email, password)
-          saveToken(token)
-          set({ user, token, loading: false })
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mayhero_token', token)
+          }
+          set({ user, loading: false })
         } catch (e: unknown) {
           set({ loading: false, error: e instanceof Error ? e.message : 'Erro ao entrar.' })
           throw e
@@ -45,17 +45,26 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true, error: null })
         try {
           const { token, user } = await api.auth.register(username, email, password)
-          saveToken(token)
-          set({ user, token, loading: false })
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mayhero_token', token)
+          }
+          set({ user, loading: false })
         } catch (e: unknown) {
           set({ loading: false, error: e instanceof Error ? e.message : 'Erro ao registrar.' })
           throw e
         }
       },
 
-      logout: () => {
-        clearToken()
-        set({ user: null, token: null })
+      logout: async () => {
+        try {
+          await api.auth.logout()
+        } catch {
+          // Always clear local auth state, even if API call fails.
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('mayhero_token')
+        }
+        set({ user: null })
       },
 
       clearError: () => set({ error: null }),
@@ -63,7 +72,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'mayhero-auth',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ user: s.user, token: s.token }),
+      partialize: (s) => ({ user: s.user }),
     }
   )
 )

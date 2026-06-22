@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
@@ -9,6 +10,13 @@ import { heroRoutes } from './routes/hero.js';
 import { rankingRoutes } from './routes/rankings.js';
 import { shopRoutes } from './routes/shop.js';
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
+const isProd = process.env.NODE_ENV === 'production';
+const jwtSecret = process.env.JWT_SECRET;
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'mayhero_token';
+if (isProd && (!jwtSecret || jwtSecret.length < 32)) {
+    throw new Error('JWT_SECRET inválido: em produção defina um segredo forte com no mínimo 32 caracteres.');
+}
+const effectiveJwtSecret = jwtSecret ?? 'mayhero-dev-secret-local-only';
 // Plugins
 await app.register(cors, {
     origin: [
@@ -18,22 +26,57 @@ await app.register(cors, {
     ],
     credentials: true,
 });
+await app.register(cookie);
 await app.register(jwt, {
-    secret: process.env.JWT_SECRET ?? 'mayhero-dev-secret-change-in-prod',
+    secret: effectiveJwtSecret,
 });
 await app.register(websocket);
-// In-memory rate limiter: 100 req/min per IP
+let redisLimiterEnabled = false;
 const _rlMap = new Map();
-app.addHook('onRequest', async (req, reply) => {
-    const ip = req.ip;
+function bucketForPath(pathname) {
+    if (pathname === '/auth/login' || pathname === '/auth/register')
+        return { bucket: 'auth', limit: 20 };
+    if (pathname === '/auth/me' || pathname === '/auth/logout')
+        return { bucket: 'auth_session', limit: 60 };
+    if (pathname === '/hero/sync')
+        return { bucket: 'sync', limit: 50 };
+    if (pathname.startsWith('/shop/buy'))
+        return { bucket: 'buy', limit: 30 };
+    return { bucket: 'default', limit: 120 };
+}
+function fallbackRateLimit(key, limit) {
     const now = Date.now();
-    let entry = _rlMap.get(ip);
+    let entry = _rlMap.get(key);
     if (!entry || entry.resetAt < now) {
         entry = { count: 0, resetAt: now + 60_000 };
-        _rlMap.set(ip, entry);
+        _rlMap.set(key, entry);
     }
     entry.count++;
-    if (entry.count > 100) {
+    return entry.count <= limit;
+}
+app.addHook('onRequest', async (req, reply) => {
+    const pathname = new URL(req.url, 'http://localhost').pathname;
+    const { bucket, limit } = bucketForPath(pathname);
+    const ua = (req.headers['user-agent'] ?? 'unknown').toString().slice(0, 120);
+    const identity = `${req.ip}:${ua}`;
+    const minuteBucket = Math.floor(Date.now() / 60_000);
+    const key = `rl:v2:${bucket}:${minuteBucket}:${identity}`;
+    let allowed = true;
+    if (redisLimiterEnabled) {
+        try {
+            const hits = await redis.incr(key);
+            if (hits === 1)
+                await redis.expire(key, 120);
+            allowed = hits <= limit;
+        }
+        catch {
+            allowed = fallbackRateLimit(`${bucket}:${identity}`, limit);
+        }
+    }
+    else {
+        allowed = fallbackRateLimit(`${bucket}:${identity}`, limit);
+    }
+    if (!allowed) {
         reply.header('Retry-After', '60');
         return reply.status(429).send({ error: 'Muitas requisições. Tente novamente em breve.' });
     }
@@ -41,7 +84,18 @@ app.addHook('onRequest', async (req, reply) => {
 // Auth decorator
 app.decorate('authenticate', async (req, reply) => {
     try {
-        await req.jwtVerify();
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Bearer ')) {
+            const token = authHeader.slice('Bearer '.length);
+            req.user = app.jwt.verify(token);
+            return;
+        }
+        const cookieToken = req.cookies?.[AUTH_COOKIE_NAME];
+        if (cookieToken) {
+            req.user = app.jwt.verify(cookieToken);
+            return;
+        }
+        return reply.status(401).send({ error: 'Não autorizado.' });
     }
     catch {
         reply.status(401).send({ error: 'Não autorizado.' });
@@ -85,6 +139,7 @@ const port = Number(process.env.PORT ?? 3070);
 const host = process.env.HOST ?? '0.0.0.0';
 try {
     await redis.connect();
+    redisLimiterEnabled = true;
     console.log('[Redis] connected');
 }
 catch {
