@@ -7,7 +7,6 @@ export const ShadowBoss: MonsterDefinition = {
   stats: { hp: 500, maxHp: 500, mp: 200, maxMp: 200, atk: 45, def: 18, spd: 6, crit: 15 },
   xpReward: 350,
   goldReward: [100, 200],
-  zone: 3,
   isBoss: true,
   drops: [
     { itemId: 'excalibur', chance: 0.12 },

@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
-import { RARITY_COLORS } from '../game/data'
-import { ITEM_BY_ID } from '../game/data'
+import { RARITY_COLORS, ITEM_BY_ID, DUNGEON_BY_ID } from '../game/data'
 import { api } from '../lib/api'
 import { getItemDisplayName } from '../game/enhancement'
 import { ItemDetailModal } from './ItemDetailModal'
@@ -26,7 +25,8 @@ interface ListingForm {
 }
 
 export function Inventory() {
-  const { inventory, hero, equipItemFromInventory, currentZone, stackableInventory } = useGameStore()
+  const { inventory, hero, equipItemFromInventory, currentDungeon, stackableInventory } = useGameStore()
+  const currentZoneId = DUNGEON_BY_ID[currentDungeon]?.zoneId ?? 1
   const { user } = useAuthStore()
   const [form, setForm] = useState<ListingForm | null>(null)
   const [search, setSearch] = useState('')
@@ -56,7 +56,7 @@ export function Inventory() {
         class: hero.class,
         level: hero.level, xp: hero.xp, xpToNext: hero.xpToNext,
         gold: hero.gold, totalKills: hero.totalKills, skillPoints: hero.skillPoints,
-        currentZone, stats: hero.stats, baseStats: hero.baseStats,
+        currentZone: currentZoneId, stats: hero.stats, baseStats: hero.baseStats,
         equipment: hero.equipment, loadout: hero.loadout, inventory,
         stackableInventory,
       }

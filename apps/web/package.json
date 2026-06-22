@@ -2,6 +2,8 @@
   "name": "@mayhero/web",
   "version": "0.1.0",
   "private": true,
+  "description": "May Hero desktop and web client",
+  "author": "May Hero Team",
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 3069",
@@ -13,8 +15,6 @@
     "electron:build": "ELECTRON_BUILD=true next build && electron-builder"
   },
   "dependencies": {
-    "electron": "^42.4.1",
-    "electron-builder": "^26.15.3",
     "electron-store": "^11.0.2",
     "framer-motion": "^12.40.0",
     "next": "16.2.9",
@@ -28,6 +28,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.3",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
@@ -37,11 +39,15 @@
   "build": {
     "appId": "com.mayhero.app",
     "productName": "May Hero",
+    "executableName": "may-hero",
     "files": [
       "electron/**/*",
       "out/**/*",
       "public/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "out/**/*"
     ],
     "linux": {
       "target": "AppImage",

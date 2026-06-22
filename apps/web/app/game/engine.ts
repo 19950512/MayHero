@@ -1,5 +1,5 @@
 import type { Hero, HeroLoadout, Enemy, BattleLog, BattleState, Equipment, ItemDefinition, SkillAllocStat } from './types'
-import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
+import { DUNGEON_BY_ID, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
 import { getEnhancedBonuses } from './enhancement'
 
 const ZERO_ALLOC = { atk: 0, def: 0, maxHp: 0, spd: 0 }
@@ -236,11 +236,13 @@ export function getBaseStatsForLevel(hero: Hero): Hero['baseStats'] {
   return base
 }
 
-export function pickEnemy(zone: number, killCount: number): Enemy {
-  const zoneData = ZONES.find(z => z.id === zone) ?? ZONES[0]
-  const isBoss = killCount > 0 && killCount % zoneData.bossEvery === 0
-  const enemies = zoneData.enemies.filter(e => e.isBoss === isBoss)
-  return { ...enemies[Math.floor(Math.random() * enemies.length)] }
+export function pickEnemy(dungeonId: string, killCount: number): Enemy {
+  const dungeon = DUNGEON_BY_ID[dungeonId] ?? Object.values(DUNGEON_BY_ID)[0]
+  const isBoss = killCount > 0 && killCount % dungeon.bossEvery === 0
+  const pool = dungeon.monsters.filter(m => m.isBoss === isBoss)
+  const monster = pool[Math.floor(Math.random() * pool.length)]
+  const { drops: _drops, ...enemy } = monster
+  return { ...enemy }
 }
 
 function rollDamage(atk: number, def: number, critChance: number): { dmg: number; isCrit: boolean } {

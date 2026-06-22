@@ -7,7 +7,6 @@ export const Wolf: MonsterDefinition = {
   stats: { hp: 35, maxHp: 35, mp: 0, maxMp: 0, atk: 9, def: 2, spd: 6, crit: 6 },
   xpReward: 18,
   goldReward: [2, 6],
-  zone: 1,
   isBoss: false,
   drops: [
     { itemId: 'speed_ring', chance: 0.03 },

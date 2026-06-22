@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '../store/authStore'
@@ -51,6 +51,18 @@ function EnhancementBar({ level }: { level: number }) {
 }
 
 export default function ForjaPage() {
+  return (
+    <Suspense fallback={<ForjaPageFallback />}>
+      <ForjaPageContent />
+    </Suspense>
+  )
+}
+
+function ForjaPageFallback() {
+  return <div className="h-full bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)]" />
+}
+
+function ForjaPageContent() {
   const { user, logout } = useAuthStore()
   const { hero, inventory, stackableInventory, enhanceInventoryItem } = useGameStore()
 

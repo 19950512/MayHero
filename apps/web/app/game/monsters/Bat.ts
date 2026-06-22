@@ -7,7 +7,6 @@ export const Bat: MonsterDefinition = {
   stats: { hp: 15, maxHp: 15, mp: 0, maxMp: 0, atk: 6, def: 0, spd: 7, crit: 5 },
   xpReward: 10,
   goldReward: [2, 5],
-  zone: 1,
   isBoss: false,
   drops: [
     { itemId: 'copper_ring', chance: 0.05 },

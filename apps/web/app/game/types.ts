@@ -151,8 +151,26 @@ export interface Enemy {
   stats: Stats
   xpReward: number
   goldReward: [number, number] // min, max
-  zone: number
   isBoss: boolean
+}
+
+export interface Dungeon {
+  id: string
+  name: string
+  description: string
+  lore?: string
+  minLevel: number
+  recommendedLevel: number
+  bossEvery: number
+  zoneId: number // maps to API zone number for backend compatibility
+  monsters: MonsterDefinition[]
+}
+
+export interface City {
+  id: string
+  name: string
+  description: string
+  dungeons: Dungeon[]
 }
 
 export interface BattleLog {
@@ -175,11 +193,3 @@ export interface BattleState {
   lastTickAt: number
 }
 
-export interface Zone {
-  id: number
-  name: string
-  description: string
-  minLevel: number
-  enemies: Enemy[]
-  bossEvery: number // spawn boss every N kills
-}

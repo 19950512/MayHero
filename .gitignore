@@ -16,6 +16,9 @@
 apps/web/.next
 apps/web/node_modules/
 
+apps/web/dist
+apps/web/out
+
 # next.js
 /.next/
 /out/

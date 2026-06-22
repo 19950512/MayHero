@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Hero, BattleState, Equipment } from '../game/types'
-import { ZONES, MONSTER_BY_ID } from '../game/data'
+import { DUNGEON_BY_ID, MONSTER_BY_ID } from '../game/data'
 import {
   createHero,
   pickEnemy,
@@ -30,7 +30,7 @@ interface GameState {
   hero: Hero | null
   heroMessage: string
   battle: BattleState
-  currentZone: number
+  currentDungeon: string
   inventory: Equipment[]
   stackableInventory: Record<string, number>
   notifications: Notification[]
@@ -44,7 +44,7 @@ interface GameState {
   startGame: (name: string, heroClass: Hero['class']) => void
   tick: () => void
   toggleAutoFight: () => void
-  changeZone: (zoneId: number) => void
+  changeDungeon: (dungeonId: string) => void
   equipItemFromInventory: (item: Equipment) => void
   unequipItem: (item: Equipment) => void
   addInventoryItem: (item: Equipment) => void
@@ -102,7 +102,7 @@ export const useGameStore = create<GameState>()(
       hero: null,
       heroMessage: '',
       battle: IDLE_BATTLE_STATE,
-      currentZone: 1,
+      currentDungeon: 'floresta_santa_rita',
       inventory: [],
       stackableInventory: {},
       notifications: [],
@@ -119,7 +119,7 @@ export const useGameStore = create<GameState>()(
           heroMessage: '',
           gameStarted: true,
           battle: IDLE_BATTLE_STATE,
-          currentZone: 1,
+          currentDungeon: 'floresta_santa_rita',
           killsInZone: 0,
           inventory: [],
           stackableInventory: {},
@@ -130,7 +130,7 @@ export const useGameStore = create<GameState>()(
       },
 
       tick: () => {
-        const { hero, battle, currentZone, autoFight, killsInZone } = get()
+        const { hero, battle, currentDungeon, autoFight, killsInZone } = get()
         if (!hero || !autoFight) return
 
         const now = Date.now()
@@ -156,7 +156,7 @@ export const useGameStore = create<GameState>()(
 
           if (battle.phase === 'defeat') {
             const healed = applyDefeat(hero)
-            const enemy = pickEnemy(currentZone, killsInZone)
+            const enemy = pickEnemy(currentDungeon, killsInZone)
             set({
               hero: healed,
               battle: {
@@ -172,7 +172,7 @@ export const useGameStore = create<GameState>()(
             return
           }
 
-          const enemy = pickEnemy(currentZone, killsInZone)
+          const enemy = pickEnemy(currentDungeon, killsInZone)
           set(() => ({
             battle: {
               active: true,
@@ -279,11 +279,11 @@ export const useGameStore = create<GameState>()(
 
       toggleAutoFight: () => set(s => ({ autoFight: !s.autoFight })),
 
-      changeZone: (zoneId) => {
+      changeDungeon: (dungeonId) => {
         const { hero } = get()
-        const zone = ZONES.find(z => z.id === zoneId)
-        if (!zone || !hero || hero.level < zone.minLevel) return
-        set({ currentZone: zoneId, killsInZone: 0, battle: IDLE_BATTLE_STATE, battleEncounterId: null })
+        const dungeon = DUNGEON_BY_ID[dungeonId]
+        if (!dungeon || !hero || hero.level < dungeon.minLevel) return
+        set({ currentDungeon: dungeonId, killsInZone: 0, battle: IDLE_BATTLE_STATE, battleEncounterId: null })
       },
 
       equipItemFromInventory: (item) => {
@@ -491,7 +491,7 @@ export const useGameStore = create<GameState>()(
           hero: null,
           heroMessage: '',
           battle: IDLE_BATTLE_STATE,
-          currentZone: 1,
+          currentDungeon: 'floresta_santa_rita',
           inventory: [],
           stackableInventory: {},
           notifications: [],
@@ -508,7 +508,7 @@ export const useGameStore = create<GameState>()(
       partialize: (state) => ({
         hero: state.hero,
         heroMessage: state.heroMessage,
-        currentZone: state.currentZone,
+        currentDungeon: state.currentDungeon,
         inventory: state.inventory,
         stackableInventory: state.stackableInventory,
         gameStarted: state.gameStarted,

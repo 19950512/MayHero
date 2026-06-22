@@ -7,7 +7,6 @@ export const ZombieMage: MonsterDefinition = {
   stats: { hp: 90, maxHp: 90, mp: 60, maxMp: 60, atk: 24, def: 6, spd: 5, crit: 10 },
   xpReward: 55,
   goldReward: [15, 25],
-  zone: 3,
   isBoss: false,
   drops: [
     { itemId: 'fire_staff', chance: 0.08 },

@@ -7,7 +7,6 @@ export const OrcBoss: MonsterDefinition = {
   stats: { hp: 100, maxHp: 100, mp: 0, maxMp: 0, atk: 14, def: 5, spd: 3, crit: 4 },
   xpReward: 60,
   goldReward: [15, 30],
-  zone: 1,
   isBoss: true,
   drops: [
     { itemId: 'chain_mail', chance: 0.15 },

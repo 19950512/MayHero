@@ -7,7 +7,6 @@ export const Goblin: MonsterDefinition = {
   stats: { hp: 30, maxHp: 30, mp: 0, maxMp: 0, atk: 7, def: 2, spd: 4, crit: 3 },
   xpReward: 14,
   goldReward: [3, 7],
-  zone: 1,
   isBoss: false,
   drops: [
     { itemId: 'iron_sword', chance: 0.04 },

@@ -7,7 +7,6 @@ export const Slime: MonsterDefinition = {
   stats: { hp: 20, maxHp: 20, mp: 0, maxMp: 0, atk: 4, def: 1, spd: 2, crit: 2 },
   xpReward: 8,
   goldReward: [1, 4],
-  zone: 1,
   isBoss: false,
   drops: [
     { itemId: 'hood', chance: 0.03 },

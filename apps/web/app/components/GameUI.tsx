@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { api } from '../lib/api'
+import { DUNGEON_BY_ID } from '../game/data'
 import { BattleScreen } from './BattleScreen'
 import { HeroStats } from './HeroStats'
 import { Inventory } from './Inventory'
@@ -41,7 +42,7 @@ export function GameUI() {
     resetGame,
     inventory,
     stackableInventory,
-    currentZone,
+    currentDungeon,
     killsInZone,
     battleEncounterId,
     setServerAuthoritativeRewards,
@@ -49,6 +50,7 @@ export function GameUI() {
     applyServerVictoryResolution,
     replaceInventory,
   } = useGameStore()
+  const currentZoneId = DUNGEON_BY_ID[currentDungeon]?.zoneId ?? 1
   const { user, logout } = useAuthStore()
   const lastSyncRef = useRef<number>(0)
   const lastVictoryKeyRef = useRef<string | null>(null)
@@ -154,7 +156,7 @@ export function GameUI() {
     api.hero.battleVictory({
       encounterId: battleEncounterId,
       enemyId: battle.enemy.id,
-      currentZone,
+      currentZone: currentZoneId,
       heroHpAfterBattle: hero.stats.hp,
     }).then(result => {
       applyServerVictoryResolution({
@@ -178,7 +180,7 @@ export function GameUI() {
       setSyncStatus('error')
       setTimeout(() => setSyncStatus('idle'), 3000)
     })
-  }, [user, hero, battle.phase, battle.turn, battle.enemy, battleEncounterId, currentZone, killsInZone, applyServerVictoryResolution, setServerAuthoritativeRewards])
+  }, [user, hero, battle.phase, battle.turn, battle.enemy, battleEncounterId, currentZoneId, killsInZone, applyServerVictoryResolution, setServerAuthoritativeRewards])
 
   // In online mode, each fight must start from a server-issued encounter.
   useEffect(() => {
@@ -188,7 +190,7 @@ export function GameUI() {
     if (battleEncounterId) return
 
     battleStartPendingRef.current = true
-    api.hero.battleStart({ currentZone })
+    api.hero.battleStart({ currentZone: currentZoneId })
       .then(({ encounterId, enemyId }) => {
         startServerEncounter({ encounterId, enemyId })
       })
@@ -201,7 +203,7 @@ export function GameUI() {
       .finally(() => {
         battleStartPendingRef.current = false
       })
-  }, [user, hero, battle.phase, battleEncounterId, currentZone, startServerEncounter, setServerAuthoritativeRewards])
+  }, [user, hero, battle.phase, battleEncounterId, currentZoneId, startServerEncounter, setServerAuthoritativeRewards])
 
   // Auto-sync to API
   useEffect(() => {
@@ -218,7 +220,7 @@ export function GameUI() {
       gold: hero.gold,
       totalKills: hero.totalKills,
       skillPoints: hero.skillPoints,
-      currentZone,
+      currentZone: currentZoneId,
       stats: hero.stats,
       baseStats: hero.baseStats,
       equipment: hero.equipment,
@@ -250,7 +252,7 @@ export function GameUI() {
         .finally(() => setTimeout(() => setSyncStatus('idle'), 3000))
 
     doSync()
-  }, [hero, user, inventory, stackableInventory, currentZone])
+  }, [hero, user, inventory, stackableInventory, currentZoneId])
 
   const electronApi = typeof window !== 'undefined'
     ? (window as Window & { electronAPI?: { isElectron?: boolean; closeWindow?: () => void } }).electronAPI

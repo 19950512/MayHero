@@ -7,7 +7,6 @@ export const Skeleton: MonsterDefinition = {
   stats: { hp: 55, maxHp: 55, mp: 0, maxMp: 0, atk: 14, def: 4, spd: 4, crit: 5 },
   xpReward: 28,
   goldReward: [6, 12],
-  zone: 2,
   isBoss: false,
   drops: [
     { itemId: 'steel_sword', chance: 0.05 },

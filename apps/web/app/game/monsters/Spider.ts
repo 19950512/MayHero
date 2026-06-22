@@ -7,7 +7,6 @@ export const Spider: MonsterDefinition = {
   stats: { hp: 48, maxHp: 48, mp: 0, maxMp: 0, atk: 16, def: 3, spd: 8, crit: 8 },
   xpReward: 32,
   goldReward: [8, 14],
-  zone: 2,
   isBoss: false,
   drops: [
     { itemId: 'speed_ring', chance: 0.05 },

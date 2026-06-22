@@ -7,7 +7,6 @@ export const StoneGolemBoss: MonsterDefinition = {
   stats: { hp: 250, maxHp: 250, mp: 0, maxMp: 0, atk: 28, def: 12, spd: 2, crit: 3 },
   xpReward: 150,
   goldReward: [40, 80],
-  zone: 2,
   isBoss: true,
   drops: [
     { itemId: 'plate_armor', chance: 0.2 },

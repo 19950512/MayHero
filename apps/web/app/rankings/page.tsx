@@ -19,9 +19,9 @@ type RankHero = {
 }
 
 const ZONE_NAMES: Record<number, string> = {
-  1: 'Floresta Sombria',
-  2: 'Cavernas de Pedra',
-  3: 'Torre do Mago Sombrio',
+  1: 'Floresta de Santa Rita',
+  2: 'Cavernas do Rio Pedroso',
+  3: 'Torre do Arauto das Sombras',
 }
 
 const CLASS_NAMES: Record<string, string> = {
