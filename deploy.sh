@@ -9,6 +9,10 @@ ENV_FILE="$ROOT_DIR/.env"
 COMPOSE_CMD=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 ACTION="${1:-up}"
 
+REMOTE_HOST="deploy@147.182.239.137"
+REMOTE_DIR="/home/deploy/MayHero"
+NGINX_DIR="/home/deploy/nginx-147.182.239.137"
+
 usage() {
   cat <<'EOF'
 Uso:
@@ -21,9 +25,11 @@ Acoes:
   logs      Exibe logs em tempo real
   ps        Lista status dos servicos
   pull      Baixa imagens base atualizadas
+  remote    Push ao git e faz deploy no servidor via SSH
 
 Exemplos:
   bash deploy.sh up
+  bash deploy.sh remote
   bash deploy.sh logs
   bash deploy.sh down
 EOF
@@ -71,6 +77,27 @@ case "$ACTION" in
   pull)
     echo "Atualizando imagens base..."
     "${COMPOSE_CMD[@]}" pull
+    ;;
+  remote)
+    echo "Fazendo push para o GitHub..."
+    git -C "$ROOT_DIR" push origin main
+
+    echo "Conectando ao servidor $REMOTE_HOST..."
+    # shellcheck disable=SC2029
+    ssh "$REMOTE_HOST" "
+      set -e
+
+      echo '==> Atualizando nginx...'
+      cd $NGINX_DIR
+      git pull
+      docker compose up -d
+
+      echo '==> Atualizando MayHero...'
+      cd $REMOTE_DIR
+      git pull
+      bash deploy.sh up
+    "
+    echo "Deploy remoto concluido."
     ;;
   *)
     echo "Erro: acao invalida: $ACTION"
