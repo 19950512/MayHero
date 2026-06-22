@@ -106,7 +106,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
+    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
       <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
@@ -117,6 +117,8 @@ export default function ShopPage() {
                 <span className="text-amber-300 font-bold">{hero.gold}</span>
               </div>
             )}
+            <Link href="/loja" className="text-amber-100/55 hover:text-amber-100">Loja</Link>
+            <Link href="/forja" className="text-amber-100/55 hover:text-amber-100">Forja</Link>
             <Link href="/rankings" className="text-amber-100/55 hover:text-amber-100">Rankings</Link>
             {user ? (
               <>

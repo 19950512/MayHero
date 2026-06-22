@@ -22,11 +22,12 @@ export interface Equipment {
   }
   icon: string
   requiredLevel: number
+  enhancement?: number  // 0-20
 }
 
 export type EquipmentBonuses = Equipment['bonuses']
 export type ItemRarity = Equipment['rarity']
-export type ItemCategory = 'equipment' | 'consumable' | 'currency'
+export type ItemCategory = 'equipment' | 'consumable' | 'currency' | 'material'
 
 export interface BaseItemDefinition {
   id: string
@@ -45,10 +46,11 @@ export interface EquipmentItemDefinition extends BaseItemDefinition {
   type: 'weapon' | 'armor' | 'helmet' | 'ring'
   bonuses: EquipmentBonuses
   requiredLevel: number
+  enhanceable?: boolean
 }
 
 export interface StackableItemDefinition extends BaseItemDefinition {
-  category: 'consumable' | 'currency'
+  category: 'consumable' | 'currency' | 'material'
   stackable: true
   maxStack: number
 }

@@ -6,6 +6,8 @@ import { useAuthStore } from '../store/authStore'
 import { RARITY_COLORS } from '../game/data'
 import { ITEM_BY_ID } from '../game/data'
 import { api } from '../lib/api'
+import { getItemDisplayName } from '../game/enhancement'
+import { ItemDetailModal } from './ItemDetailModal'
 import type { Equipment } from '../game/types'
 
 const SLOT_LABELS: Record<Equipment['slot'], string> = {
@@ -27,6 +29,8 @@ export function Inventory() {
   const { inventory, hero, equipItemFromInventory, currentZone, stackableInventory } = useGameStore()
   const { user } = useAuthStore()
   const [form, setForm] = useState<ListingForm | null>(null)
+  const [search, setSearch] = useState('')
+  const [detailItem, setDetailItem] = useState<Equipment | null>(null)
 
   if (!hero) return null
 
@@ -47,7 +51,6 @@ export function Inventory() {
     setForm(f => f ? { ...f, loading: true, error: null } : null)
 
     try {
-      // Ensure hero is synced to DB so inventory items have IDs
       const syncData = {
         name: hero.name,
         class: hero.class,
@@ -67,7 +70,6 @@ export function Inventory() {
         } else throw e
       }
 
-      // Fetch DB inventory to get item IDs
       const dbItems = await api.hero.inventory()
       const dbItem = dbItems.find(di =>
         di.itemData.id === item.id &&
@@ -84,10 +86,38 @@ export function Inventory() {
     }
   }
 
+  const filteredInventory = search.trim()
+    ? inventory.filter(item =>
+        getItemDisplayName(item).toLowerCase().includes(search.toLowerCase()) ||
+        SLOT_LABELS[item.slot].toLowerCase().includes(search.toLowerCase())
+      )
+    : inventory
+
   return (
     <div className="flex flex-col gap-2 h-full overflow-y-auto">
+      {detailItem && (
+        <ItemDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onEquip={() => equipItemFromInventory(detailItem)}
+          canEquip={hero.level >= detailItem.requiredLevel}
+        />
+      )}
+
       <p className="text-white/40 text-xs uppercase font-bold">Inventário ({inventory.length})</p>
 
+      {/* Search */}
+      {inventory.length > 0 && (
+        <input
+          type="text"
+          placeholder="Buscar item..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25"
+        />
+      )}
+
+      {/* Stackable items */}
       {Object.entries(stackableInventory).some(([, qty]) => qty > 0) && (
         <div className="bg-slate-900/40 rounded-lg border border-white/10 p-2.5">
           <p className="text-white/45 text-xs uppercase font-bold mb-2">Consumíveis e Recursos</p>
@@ -108,32 +138,50 @@ export function Inventory() {
         </div>
       )}
 
-      {inventory.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/20 text-sm text-center">
-            Nenhum item ainda.<br />
-            Derrote inimigos para obter drops!
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          {inventory.map((item, idx) => {
+      {/* Equipment list */}
+      <div className="flex flex-col gap-1.5">
+        {inventory.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-white/20 text-sm text-center">
+              Nenhum item ainda.<br />
+              Derrote inimigos para obter drops!
+            </p>
+          </div>
+        ) : filteredInventory.length === 0 ? (
+          <p className="text-white/25 text-xs text-center py-4">Nenhum item encontrado para &quot;{search}&quot;</p>
+        ) : (
+          filteredInventory.map((item) => {
+            const realIdx = inventory.indexOf(item)
             const canEquip = hero.level >= item.requiredLevel
+            const enhancement = item.enhancement ?? 0
             const bonusText = Object.entries(item.bonuses)
               .map(([k, v]) => `+${v} ${k.toUpperCase()}`)
               .join(', ')
-            const isListingThis = form?.index === idx
+            const isListingThis = form?.index === realIdx
 
             return (
               <div
-                key={`${item.id}-${idx}`}
+                key={`${item.id}-${realIdx}`}
                 className="bg-slate-800/60 rounded-lg border border-white/5 overflow-hidden"
               >
                 <div className="p-2.5 flex items-center gap-3">
-                  <span className="text-xl w-8 text-center">{item.icon}</span>
+                  {/* Clickable icon → detail modal */}
+                  <button
+                    onClick={() => setDetailItem(item)}
+                    className="text-xl w-8 text-center shrink-0 hover:scale-125 transition-transform"
+                    title="Ver detalhes"
+                  >
+                    {item.icon}
+                  </button>
+
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <p className={`text-xs font-bold ${RARITY_COLORS[item.rarity]}`}>{item.name}</p>
+                      {enhancement > 0 && (
+                        <span className={`text-xs font-bold px-1 rounded ${enhancement >= 15 ? 'text-red-400 bg-red-900/20' : enhancement >= 8 ? 'text-amber-400 bg-amber-900/20' : 'text-green-400 bg-green-900/20'}`}>
+                          +{enhancement}
+                        </span>
+                      )}
                       <span className="text-white/20 text-xs">•</span>
                       <span className="text-white/30 text-xs">{SLOT_LABELS[item.slot]}</span>
                     </div>
@@ -144,6 +192,7 @@ export function Inventory() {
                       </p>
                     )}
                   </div>
+
                   <div className="flex gap-1.5 shrink-0">
                     <button
                       onClick={() => equipItemFromInventory(item)}
@@ -154,7 +203,7 @@ export function Inventory() {
                     </button>
                     {user && !isListingThis && (
                       <button
-                        onClick={() => handleStartList(idx)}
+                        onClick={() => handleStartList(realIdx)}
                         className="px-2.5 py-1.5 rounded-md text-xs font-bold bg-yellow-700/80 hover:bg-yellow-600 text-white transition-colors"
                       >
                         Vender
@@ -205,9 +254,9 @@ export function Inventory() {
                 )}
               </div>
             )
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </div>
   )
 }

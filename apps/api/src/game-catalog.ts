@@ -31,6 +31,7 @@ export interface EquipmentItemData {
   bonuses: EquipmentBonuses
   icon: string
   requiredLevel: number
+  enhancement?: number  // 0-20
 }
 
 export const HERO_CLASSES: readonly HeroClass[] = ['warrior', 'archer', 'mage', 'knight', 'paladin', 'druid'] as const
@@ -104,7 +105,7 @@ export function baseStatsForLevel(heroClass: HeroClass, level: number): Stats {
   return base
 }
 
-type ItemCategory = 'equipment' | 'consumable' | 'currency'
+type ItemCategory = 'equipment' | 'consumable' | 'currency' | 'material'
 
 type CatalogItem = {
   id: string
@@ -148,6 +149,14 @@ const CATALOG_ITEMS: CatalogItem[] = [
   })),
   { id: 'healing_potion', name: 'Poção de Vida', icon: '🧪', rarity: 'common', category: 'consumable', stackable: true },
   { id: 'gold_coin', name: 'Gold', icon: '🪙', rarity: 'common', category: 'currency', stackable: true },
+  { id: 'nucleo_baixo', name: 'Núcleo de Aprimoramento Baixo', icon: '🔸', rarity: 'common', category: 'material', stackable: true },
+  { id: 'nucleo_medio', name: 'Núcleo de Aprimoramento Médio', icon: '🔶', rarity: 'rare', category: 'material', stackable: true },
+  { id: 'nucleo_alto', name: 'Núcleo de Aprimoramento Alto', icon: '💠', rarity: 'epic', category: 'material', stackable: true },
+  { id: 'nucleo_altissimo', name: 'Núcleo de Aprimoramento Altíssimo', icon: '💎', rarity: 'legendary', category: 'material', stackable: true },
+  { id: 'nucleo_baixo_perfeito', name: 'Núcleo Baixo Perfeito', icon: '✨', rarity: 'common', category: 'material', stackable: true },
+  { id: 'nucleo_medio_perfeito', name: 'Núcleo Médio Perfeito', icon: '🌟', rarity: 'rare', category: 'material', stackable: true },
+  { id: 'nucleo_alto_perfeito', name: 'Núcleo Alto Perfeito', icon: '⭐', rarity: 'epic', category: 'material', stackable: true },
+  { id: 'nucleo_altissimo_perfeito', name: 'Núcleo Altíssimo Perfeito', icon: '🏆', rarity: 'legendary', category: 'material', stackable: true },
 ]
 
 const CATALOG_ITEM_BY_ID = new Map(CATALOG_ITEMS.map(item => [item.id, item]))
@@ -272,6 +281,14 @@ export function normalizeEquipmentItemData(input: unknown): EquipmentItemData | 
   if (data.icon !== undefined && data.icon !== canonical.icon) return null
   if (data.bonuses !== undefined && !sameBonuses(data.bonuses, canonical.bonuses)) return null
 
+  const enhancementRaw = data.enhancement
+  const enhancement = enhancementRaw === undefined || enhancementRaw === null
+    ? undefined
+    : typeof enhancementRaw === 'number' && Number.isInteger(enhancementRaw) && enhancementRaw >= 0 && enhancementRaw <= 20
+      ? enhancementRaw
+      : null
+  if (enhancement === null) return null
+
   return {
     id: canonical.id,
     name: canonical.name,
@@ -280,6 +297,7 @@ export function normalizeEquipmentItemData(input: unknown): EquipmentItemData | 
     bonuses: { ...canonical.bonuses },
     icon: canonical.icon,
     requiredLevel: canonical.requiredLevel,
+    ...(enhancement !== undefined ? { enhancement } : {}),
   }
 }
 

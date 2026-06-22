@@ -1,9 +1,13 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useGameStore } from '../store/gameStore'
 import { computeStats, getHeroLoadout, normalizeSkillAllocationsForLevel } from '../game/engine'
 import { RARITY_COLORS } from '../game/data'
 import { HERO_CLASS_BY_ID } from '../game/classes'
+import { getItemDisplayName } from '../game/enhancement'
+import { ItemDetailModal } from './ItemDetailModal'
 import type { Equipment, SkillAllocStat } from '../game/types'
 
 const SKILL_OPTIONS: { stat: SkillAllocStat; label: string; icon: string; bonus: string }[] = [
@@ -14,7 +18,9 @@ const SKILL_OPTIONS: { stat: SkillAllocStat; label: string; icon: string; bonus:
 ]
 
 export function HeroStats() {
-  const { hero, heroMessage, setHeroMessage, spendSkillPoint } = useGameStore()
+  const { hero, heroMessage, setHeroMessage, spendSkillPoint, unequipItem } = useGameStore()
+  const [detailItem, setDetailItem] = useState<Equipment | null>(null)
+  const router = useRouter()
   if (!hero) return null
 
   const stats = computeStats(hero)
@@ -71,7 +77,11 @@ export function HeroStats() {
   const renderSlot = (slot: { key: string; label: string; item?: Equipment; emptyIcon: string }) => {
     const item = slot.item
     return (
-      <div key={slot.key} className="bg-black/25 rounded-lg p-2 border border-amber-100/10">
+      <div
+        key={slot.key}
+        onClick={() => item && setDetailItem(item)}
+        className={`bg-black/25 rounded-lg p-2 border border-amber-100/10 ${item ? 'cursor-pointer hover:bg-amber-900/15 hover:border-amber-100/20 transition-colors' : ''}`}
+      >
         <div className="flex items-center gap-2 mb-1">
           <span className="w-6 h-6 rounded-md bg-amber-900/25 border border-amber-100/15 flex items-center justify-center text-sm">
             {item?.icon ?? slot.emptyIcon}
@@ -79,7 +89,7 @@ export function HeroStats() {
           <p className="text-[10px] uppercase tracking-wide text-amber-100/40 leading-tight">{slot.label}</p>
         </div>
         {item ? (
-          <p className={`text-xs font-bold leading-tight ${RARITY_COLORS[item.rarity]}`}>{item.name}</p>
+          <p className={`text-xs font-bold leading-tight ${RARITY_COLORS[item.rarity]}`}>{getItemDisplayName(item)}</p>
         ) : (
           <p className="text-xs text-amber-100/25">Vazio</p>
         )}
@@ -89,6 +99,20 @@ export function HeroStats() {
 
   return (
     <div className="flex flex-col gap-3 h-full overflow-y-auto">
+      {detailItem && (
+        <ItemDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onUnequip={() => {
+            unequipItem(detailItem)
+          }}
+          onForge={() => {
+            unequipItem(detailItem)
+            const enh = detailItem.enhancement ?? 0
+            router.push(`/forja?id=${detailItem.id}&slot=${detailItem.slot}&rarity=${detailItem.rarity}&enh=${enh}`)
+          }}
+        />
+      )}
       <div className="bg-gradient-to-b from-[#23180f] to-[#130f0a] rounded-xl p-3 border border-amber-700/40">
         <div className="flex gap-3">
           <div className="w-24 h-24 rounded-xl border border-amber-200/25 bg-[radial-gradient(circle_at_30%_20%,#5d3f1e_0%,#1b140f_70%)] flex flex-col items-center justify-center shrink-0">
@@ -207,7 +231,7 @@ export function HeroStats() {
                 <p className="text-[10px] uppercase tracking-wide text-amber-100/40">{pet.label}</p>
               </div>
               {pet.item ? (
-                <p className={`text-xs font-bold ${RARITY_COLORS[pet.item.rarity]}`}>{pet.item.name}</p>
+                <p className={`text-xs font-bold ${RARITY_COLORS[pet.item.rarity]}`}>{getItemDisplayName(pet.item)}</p>
               ) : (
                 <p className="text-xs text-amber-100/25">Sem pet equipado</p>
               )}

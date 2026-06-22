@@ -20,6 +20,14 @@ import { LaminaSombria } from './LaminaSombria'
 import { PocaoDeVida } from './PocaoDeVida'
 import { RoupaDeTecido } from './RoupaDeTecido'
 import { ArcoDoCacador } from './ArcoDoCacador'
+import { NucleoBaixo } from './NucleoBaixo'
+import { NucleoMedio } from './NucleoMedio'
+import { NucleoAlto } from './NucleoAlto'
+import { NucleoAltissimo } from './NucleoAltissimo'
+import { NucleoBaixoPerfeito } from './NucleoBaixoPerfeito'
+import { NucleoMedioPerfeito } from './NucleoMedioPerfeito'
+import { NucleoAltoPerfeito } from './NucleoAltoPerfeito'
+import { NucleoAltissimoPerfeito } from './NucleoAltissimoPerfeito'
 
 export const ITEM_CATALOG: ItemDefinition[] = [
   Galho,
@@ -43,6 +51,14 @@ export const ITEM_CATALOG: ItemDefinition[] = [
   AnelDoPoder,
   PocaoDeVida,
   Gold,
+  NucleoBaixo,
+  NucleoMedio,
+  NucleoAlto,
+  NucleoAltissimo,
+  NucleoBaixoPerfeito,
+  NucleoMedioPerfeito,
+  NucleoAltoPerfeito,
+  NucleoAltissimoPerfeito,
 ]
 
 export const EQUIPMENT_POOL: Equipment[] = ITEM_CATALOG

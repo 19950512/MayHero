@@ -11,11 +11,14 @@ import {
   applyVictory,
   applyDefeat,
   equipItem,
+  unequipItem as engineUnequipItem,
   computeStats,
   healHero,
   allocateSkillPoint,
 } from '../game/engine'
 import type { SkillAllocStat } from '../game/types'
+import { attemptEnhancement, NPC_STORE } from '../game/enhancement'
+import type { EnhancementResult } from '../game/enhancement'
 
 interface Notification {
   id: string
@@ -43,6 +46,7 @@ interface GameState {
   toggleAutoFight: () => void
   changeZone: (zoneId: number) => void
   equipItemFromInventory: (item: Equipment) => void
+  unequipItem: (item: Equipment) => void
   addInventoryItem: (item: Equipment) => void
   replaceInventory: (items: Equipment[]) => void
   dismissNotification: (id: string) => void
@@ -52,6 +56,8 @@ interface GameState {
   renameHero: (newName: string) => void
   setHeroMessage: (message: string) => void
   setServerAuthoritativeRewards: (enabled: boolean) => void
+  enhanceInventoryItem: (item: Equipment, coreId: string) => EnhancementResult | null
+  buyFromNpcStore: (itemId: string, quantity: number) => { ok: boolean; error?: string }
   startServerEncounter: (payload: { encounterId: string; enemyId: string }) => void
   applyServerVictoryResolution: (payload: {
     hero: {
@@ -284,9 +290,21 @@ export const useGameStore = create<GameState>()(
         const { hero, inventory } = get()
         if (!hero) return
         const { hero: updatedHero, replacedItem } = equipItem(hero, item)
-        const newInventory = inventory.filter(i => i.id !== item.id || i !== item)
+        const newInventory = inventory.filter(i => !(
+          i.id === item.id && i.slot === item.slot &&
+          i.rarity === item.rarity && i.name === item.name &&
+          (i.enhancement ?? 0) === (item.enhancement ?? 0)
+        ))
         if (replacedItem) newInventory.push(replacedItem)
         set({ hero: updatedHero, inventory: newInventory })
+      },
+
+      unequipItem: (item) => {
+        const { hero, inventory } = get()
+        if (!hero) return
+        const result = engineUnequipItem(hero, item)
+        if (!result) return
+        set({ hero: result.hero, inventory: [...inventory, item] })
       },
 
       addInventoryItem: (item) => {
@@ -318,6 +336,57 @@ export const useGameStore = create<GameState>()(
         else newStackableInventory.healing_potion = remaining
 
         set({ hero: healed, stackableInventory: newStackableInventory })
+      },
+
+      enhanceInventoryItem: (item, coreId) => {
+        const { hero, inventory, stackableInventory } = get()
+        if (!hero) return null
+
+        const coreCount = stackableInventory[coreId] ?? 0
+        if (coreCount <= 0) return null
+
+        const result = attemptEnhancement(item, coreId)
+        if (result.message === 'Núcleo inválido.' || result.message.startsWith('Este núcleo')) return result
+
+        // Find by structural equality — reference equality fails after re-renders/re-hydration
+        const itemIdx = inventory.findIndex(i =>
+          i.id === item.id &&
+          i.slot === item.slot &&
+          i.rarity === item.rarity &&
+          i.name === item.name &&
+          (i.enhancement ?? 0) === (item.enhancement ?? 0)
+        )
+        if (itemIdx === -1) return null
+
+        const newStackable = { ...stackableInventory }
+        const remaining = coreCount - 1
+        if (remaining <= 0) delete newStackable[coreId]
+        else newStackable[coreId] = remaining
+
+        const newInventory = [...inventory]
+        newInventory[itemIdx] = result.newItem
+        set({ inventory: newInventory, stackableInventory: newStackable })
+        return result
+      },
+
+      buyFromNpcStore: (itemId, quantity) => {
+        const { hero } = get()
+        if (!hero) return { ok: false, error: 'Sem herói ativo.' }
+
+        const entry = NPC_STORE.find(e => e.itemId === itemId)
+        if (!entry) return { ok: false, error: 'Item não encontrado na loja.' }
+
+        const totalCost = entry.price * quantity
+        if (hero.gold < totalCost) return { ok: false, error: 'Ouro insuficiente.' }
+
+        const newStackable = { ...get().stackableInventory }
+        newStackable[itemId] = (newStackable[itemId] ?? 0) + quantity
+
+        set({
+          hero: { ...hero, gold: hero.gold - totalCost },
+          stackableInventory: newStackable,
+        })
+        return { ok: true }
       },
 
       spendSkillPoint: (stat) => {

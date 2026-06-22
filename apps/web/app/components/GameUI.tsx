@@ -24,6 +24,10 @@ const TABS: { id: Tab; label: string; sigil: string }[] = [
 
 const SYNC_INTERVAL_MS = 30_000
 
+// Module-level flag — survives component remounts (e.g. navigating /forja → /)
+// but resets on full page reload. Prevents re-hydrating on remount and wiping local enhancements.
+let sessionInventoryHydrated = false
+
 export function GameUI() {
   const [activeTab, setActiveTab] = useState<Tab>('battle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
@@ -49,7 +53,6 @@ export function GameUI() {
   const lastSyncRef = useRef<number>(0)
   const lastVictoryKeyRef = useRef<string | null>(null)
   const battleStartPendingRef = useRef(false)
-  const inventoryHydratedRef = useRef(false)
 
   const toEquipment = (value: unknown): Equipment | null => {
     if (!value || typeof value !== 'object') return null
@@ -83,6 +86,9 @@ export function GameUI() {
       bonuses: bonuses as Equipment['bonuses'],
       icon: raw.icon,
       requiredLevel: raw.requiredLevel,
+      ...(typeof raw.enhancement === 'number' && raw.enhancement > 0
+        ? { enhancement: raw.enhancement }
+        : {}),
     }
   }
 
@@ -94,13 +100,15 @@ export function GameUI() {
 
   useEffect(() => {
     setServerAuthoritativeRewards(!!user)
-    if (!user) inventoryHydratedRef.current = false
+    if (!user) sessionInventoryHydrated = false
   }, [user, setServerAuthoritativeRewards])
 
-  // Hydrate local inventory from API once per authenticated session in this UI lifecycle.
+  // Hydrate local inventory from API once per session lifecycle.
+  // Uses a module-level flag so navigating away and back doesn't re-run this
+  // and overwrite locally-enhanced items with stale server data.
   useEffect(() => {
     if (!user || !hero) return
-    if (inventoryHydratedRef.current) return
+    if (sessionInventoryHydrated) return
 
     api.hero.inventory()
       .then(dbItems => {
@@ -108,7 +116,7 @@ export function GameUI() {
           .map(db => toEquipment(db.itemData))
           .filter((item): item is Equipment => !!item)
         replaceInventory(items)
-        inventoryHydratedRef.current = true
+        sessionInventoryHydrated = true
       })
       .catch(() => {
         // Ignore transient failures; local inventory remains available.
@@ -356,6 +364,12 @@ export function GameUI() {
                 </Link>
                 <Link href="/shop" className="text-center py-2 rounded-lg text-xs text-amber-300/70 hover:text-amber-300 hover:bg-amber-950/30 transition-colors">
                   Mercado de Itens
+                </Link>
+                <Link href="/loja" className="text-center py-2 rounded-lg text-xs text-amber-300/70 hover:text-amber-300 hover:bg-amber-950/30 transition-colors">
+                  ⚒️ Loja do Ferreiro
+                </Link>
+                <Link href="/forja" className="text-center py-2 rounded-lg text-xs text-amber-400/70 hover:text-amber-400 hover:bg-amber-950/30 transition-colors">
+                  🔨 Forja de Aprimoramento
                 </Link>
                 <button
                   onClick={() => {

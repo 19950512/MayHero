@@ -1,5 +1,6 @@
 import type { Hero, HeroLoadout, Enemy, BattleLog, BattleState, Equipment, ItemDefinition, SkillAllocStat } from './types'
 import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
+import { getEnhancedBonuses } from './enhancement'
 
 const ZERO_ALLOC = { atk: 0, def: 0, maxHp: 0, spd: 0 }
 const SKILL_ALLOC_ORDER: SkillAllocStat[] = ['atk', 'def', 'maxHp', 'spd']
@@ -106,13 +107,51 @@ export function getHeroLoadout(hero: Hero): HeroLoadout {
   }
 }
 
-function buildLegacyEquipmentFromLoadout(loadout: HeroLoadout): Hero['equipment'] {
+export function buildLegacyEquipmentFromLoadout(loadout: HeroLoadout): Hero['equipment'] {
   return {
     weapon: loadout.equipment.mainhand,
     armor: loadout.equipment.body,
     helm: loadout.equipment.head,
     ring: loadout.accessories.ring1,
   }
+}
+
+export function unequipItem(hero: Hero, item: Equipment): { hero: Hero } | null {
+  const loadout = getHeroLoadout(hero)
+
+  const matches = (a?: Equipment) =>
+    !!a && a.id === item.id && a.slot === item.slot && a.rarity === item.rarity &&
+    a.name === item.name && (a.enhancement ?? 0) === (item.enhancement ?? 0)
+
+  let found = false
+
+  const eqKeys = ['head', 'body', 'legs', 'boots', 'offhand', 'mainhand'] as const
+  for (const key of eqKeys) {
+    if (matches(loadout.equipment[key])) {
+      loadout.equipment[key] = undefined
+      found = true
+      break
+    }
+  }
+
+  if (!found) {
+    const accKeys = ['amulet', 'ring1', 'ring2', 'ring3', 'ring4', 'cornalina1', 'cornalina2', 'talisma1', 'talisma2', 'belt', 'earring1', 'earring2'] as const
+    for (const key of accKeys) {
+      if (matches(loadout.accessories[key])) {
+        loadout.accessories[key] = undefined
+        found = true
+        break
+      }
+    }
+  }
+
+  if (!found) return null
+
+  const newEquipment = buildLegacyEquipmentFromLoadout(loadout)
+  const newBaseStats = getBaseStatsForLevel(hero)
+  const newHero = { ...hero, equipment: newEquipment, loadout, baseStats: newBaseStats }
+  const newStats = computeStats(newHero)
+  return { hero: { ...newHero, stats: { ...newStats, hp: Math.min(newStats.maxHp, hero.stats.hp) } } }
 }
 
 function getEquippedItemsFromLoadout(loadout: HeroLoadout): Equipment[] {
@@ -165,7 +204,7 @@ export function computeStats(hero: Hero): Hero['stats'] {
   const equippedItems = getEquippedItemsFromLoadout(loadout)
 
   for (const equip of equippedItems) {
-    for (const [key, val] of Object.entries(equip.bonuses)) {
+    for (const [key, val] of Object.entries(getEnhancedBonuses(equip))) {
       const k = key as keyof typeof base
       if (k in base) (base[k] as number) += val as number
     }
