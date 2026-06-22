@@ -24,6 +24,59 @@ export interface Equipment {
   requiredLevel: number
 }
 
+export type EquipmentBonuses = Equipment['bonuses']
+export type ItemRarity = Equipment['rarity']
+export type ItemCategory = 'equipment' | 'consumable' | 'currency'
+
+export interface BaseItemDefinition {
+  id: string
+  name: string
+  icon: string
+  rarity: ItemRarity
+  category: ItemCategory
+  stackable: boolean
+  maxStack?: number
+}
+
+export interface EquipmentItemDefinition extends BaseItemDefinition {
+  category: 'equipment'
+  stackable: false
+  slot: Equipment['slot']
+  type: 'weapon' | 'armor' | 'helmet' | 'ring'
+  bonuses: EquipmentBonuses
+  requiredLevel: number
+}
+
+export interface StackableItemDefinition extends BaseItemDefinition {
+  category: 'consumable' | 'currency'
+  stackable: true
+  maxStack: number
+}
+
+export type ItemDefinition = EquipmentItemDefinition | StackableItemDefinition
+
+export interface MonsterDrop {
+  itemId: string
+  chance: number
+  minQuantity?: number
+  maxQuantity?: number
+}
+
+export interface MonsterDefinition extends Enemy {
+  drops: MonsterDrop[]
+}
+
+export interface HeroClassDefinition {
+  id: HeroClass
+  name: string
+  shortName: string
+  description: string
+  sigil: string
+  themeColor: string
+  baseStats: Stats
+  statGrowth: Partial<Stats>
+}
+
 export type SkillAllocStat = 'atk' | 'def' | 'maxHp' | 'spd'
 
 export interface SkillAllocations {

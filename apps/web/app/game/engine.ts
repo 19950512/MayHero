@@ -1,13 +1,43 @@
-import type { Hero, Enemy, BattleLog, BattleState, Equipment, SkillAllocStat } from './types'
-import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, EQUIPMENT_POOL } from './data'
+import type { Hero, Enemy, BattleLog, BattleState, Equipment, ItemDefinition, SkillAllocStat } from './types'
+import { ZONES, XP_CURVE, LEVEL_STAT_GROWTH, BASE_STATS, ITEM_BY_ID, MONSTER_BY_ID } from './data'
 
 const ZERO_ALLOC = { atk: 0, def: 0, maxHp: 0, spd: 0 }
 
-const RARITY_WEIGHTS: Record<Equipment['rarity'], number> = {
-  common: 60,
-  rare: 25,
-  epic: 12,
-  legendary: 3,
+const RARITY_PRIORITY: Record<Equipment['rarity'], number> = {
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
+}
+
+interface ResolvedMonsterDrop {
+  item: ItemDefinition
+  quantity: number
+}
+
+interface StackableDropResult {
+  itemId: string
+  name: string
+  quantity: number
+}
+
+function resolveMonsterDrops(enemy: Enemy): ResolvedMonsterDrop[] {
+  const monster = MONSTER_BY_ID[enemy.id]
+  if (!monster) return []
+
+  const drops: ResolvedMonsterDrop[] = []
+  for (const drop of monster.drops) {
+    if (Math.random() > drop.chance) continue
+    const item = ITEM_BY_ID[drop.itemId]
+    if (!item) continue
+
+    const minQ = drop.minQuantity ?? 1
+    const maxQ = drop.maxQuantity ?? minQ
+    const quantity = Math.floor(Math.random() * (maxQ - minQ + 1)) + minQ
+    drops.push({ item, quantity })
+  }
+
+  return drops
 }
 
 export function computeStats(hero: Hero): Hero['stats'] {
@@ -124,13 +154,20 @@ export function simulateBattleTick(
   return { heroHp, enemyHp, logs, phase }
 }
 
-export function applyVictory(hero: Hero, enemy: Enemy): { hero: Hero; goldEarned: number; xpEarned: number; leveledUp: boolean; itemDrop?: Equipment } {
-  const goldEarned = Math.floor(Math.random() * (enemy.goldReward[1] - enemy.goldReward[0] + 1)) + enemy.goldReward[0]
+export function applyVictory(hero: Hero, enemy: Enemy): {
+  hero: Hero
+  goldEarned: number
+  xpEarned: number
+  leveledUp: boolean
+  itemDrop?: Equipment
+  stackableDrops: StackableDropResult[]
+} {
+  const baseGoldEarned = Math.floor(Math.random() * (enemy.goldReward[1] - enemy.goldReward[0] + 1)) + enemy.goldReward[0]
   const xpEarned = enemy.xpReward
 
   let newHero: Hero = {
     ...hero,
-    gold: hero.gold + goldEarned,
+    gold: hero.gold + baseGoldEarned,
     xp: hero.xp + xpEarned,
     totalKills: hero.totalKills + 1,
   }
@@ -156,25 +193,60 @@ export function applyVictory(hero: Hero, enemy: Enemy): { hero: Hero; goldEarned
     newHero = { ...newHero, stats: finalStats }
   }
 
-  // 15% chance for item drop, rarity-weighted
+  const resolvedDrops = resolveMonsterDrops(enemy)
+  let extraGoldFromDrops = 0
+  const stackableDrops: StackableDropResult[] = []
+
   let itemDrop: Equipment | undefined
-  if (Math.random() < 0.15) {
-    const eligible = EQUIPMENT_POOL.filter(e => e.requiredLevel <= newHero.level)
-    if (eligible.length > 0) {
-      const totalWeight = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0)
-      let roll = Math.random() * totalWeight
-      let pickedRarity: Equipment['rarity'] = 'common'
-      for (const [r, w] of Object.entries(RARITY_WEIGHTS) as [Equipment['rarity'], number][]) {
-        roll -= w
-        if (roll <= 0) { pickedRarity = r; break }
-      }
-      const rarityPool = eligible.filter(e => e.rarity === pickedRarity)
-      const finalPool = rarityPool.length > 0 ? rarityPool : eligible.filter(e => e.rarity === 'common')
-      itemDrop = finalPool[Math.floor(Math.random() * finalPool.length)]
+
+  const rarityScore = (rarity: Equipment['rarity']) => RARITY_PRIORITY[rarity]
+  const sortedDrops = [...resolvedDrops].sort((a, b) => {
+    if (a.item.category !== 'equipment' && b.item.category === 'equipment') return 1
+    if (a.item.category === 'equipment' && b.item.category !== 'equipment') return -1
+    if (a.item.rarity !== b.item.rarity) return rarityScore(b.item.rarity) - rarityScore(a.item.rarity)
+    return 0
+  })
+
+  for (const resolved of sortedDrops) {
+    const item = resolved.item
+    if (item.category === 'currency' && item.id === 'gold_coin') {
+      extraGoldFromDrops += resolved.quantity
+      continue
     }
+
+    if (item.category === 'equipment') {
+      if (itemDrop || item.requiredLevel > newHero.level) continue
+      itemDrop = {
+        id: item.id,
+        name: item.name,
+        slot: item.slot,
+        rarity: item.rarity,
+        bonuses: item.bonuses,
+        icon: item.icon,
+        requiredLevel: item.requiredLevel,
+      }
+      continue
+    }
+
+    stackableDrops.push({
+      itemId: item.id,
+      name: item.name,
+      quantity: resolved.quantity,
+    })
   }
 
-  return { hero: newHero, goldEarned, xpEarned, leveledUp, itemDrop }
+  if (extraGoldFromDrops > 0) {
+    newHero = { ...newHero, gold: newHero.gold + extraGoldFromDrops }
+  }
+
+  return {
+    hero: newHero,
+    goldEarned: baseGoldEarned + extraGoldFromDrops,
+    xpEarned,
+    leveledUp,
+    itemDrop,
+    stackableDrops,
+  }
 }
 
 export function applyDefeat(hero: Hero): Hero {

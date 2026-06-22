@@ -2,7 +2,7 @@
 
 > **Status:** Em desenvolvimento ativo  
 > **Stack:** Next.js 16 + Fastify 5 + PostgreSQL + Redis + Electron  
-> **Versão atual:** 0.2.0
+> **Versão atual:** 0.3.0
 
 ---
 
@@ -20,7 +20,7 @@ Criar herói → Auto-batalha (1 turno a cada 1.5s) → Vitória/Derrota → Pr�
 
 1. O herói inicia na **Zona 1** e combate inimigos automaticamente
 2. A cada **1.5 segundos** ocorre um turno: herói ataca, inimigo contra-ataca
-3. Na **vitória**: ganha XP, ouro e chance de drop de item (15%, ponderado por raridade)
+3. Na **vitória**: ganha XP, ouro e drops definidos pela tabela do monstro (chance e quantidade por item)
 4. Na **derrota**: perde 10% do ouro, HP restaurado a 50%, próxima batalha começa
 5. A cada **10 abates** na zona aparece um **Chefe** com recompensas maiores
 6. O jogador pode **pausar** o auto-battle ou **trocar de zona** manualmente
@@ -34,17 +34,20 @@ Criar herói → Auto-batalha (1 turno a cada 1.5s) → Vitória/Derrota → Pr�
 |---|---|---|---|---|---|---|
 | ⚔️ Guerreiro | 120 | 12 | 8 | 5 | 8% | Tank — sobrevive bem, cresce consistente |
 | 🏹 Arqueiro | 90 | 15 | 5 | 9 | 15% | DPS — abate rápido, frágil |
-| 🔮 Mago | 70 | 18 | 3 | 6 | 10% | Burst — maior ATK, morre fácil |
+| 🔮 Sorcerer | 70 | 18 | 3 | 6 | 10% | Burst — maior ATK, morre fácil |
+| 🛡️ Knight | 145 | 10 | 12 | 4 | 6% | Frontline pesado — máxima resistência |
+| ✨ Paladin | 105 | 13 | 9 | 6 | 9% | Híbrido ofensivo/defensivo |
+| 🌿 Druid | 80 | 14 | 5 | 7 | 12% | Místico ágil — dano e mobilidade |
 
 ### Crescimento por nível
 
-| Stat | Guerreiro/nível | Arqueiro/nível | Mago/nível |
-|---|---|---|---|
-| Max HP | +18 | +12 | +8 |
-| ATK | +2.5 | +3.2 | +4.0 |
-| DEF | +1.5 | +1.0 | +0.8 |
-| VEL | +0.3 | +0.5 | +0.3 |
-| CRIT | +0.2% | +0.4% | +0.3% |
+| Stat | Guerreiro | Arqueiro | Sorcerer | Knight | Paladin | Druid |
+|---|---|---|---|---|---|---|
+| Max HP/nível | +18 | +12 | +8 | +22 | +16 | +10 |
+| ATK/nível | +2.5 | +3.2 | +4.0 | +2.0 | +2.8 | +3.5 |
+| DEF/nível | +1.5 | +1.0 | +0.8 | +2.0 | +1.4 | +0.9 |
+| VEL/nível | +0.3 | +0.5 | +0.3 | +0.2 | +0.3 | +0.4 |
+| CRIT/nível | +0.2% | +0.4% | +0.3% | +0.1% | +0.2% | +0.35% |
 
 ---
 
@@ -89,7 +92,7 @@ A cada level-up o jogador recebe 1 ponto para alocar (permanente, sem refund):
 | VEL | +1 VEL |
 
 ### Poção
-- Custo: `10 + nível × 2` de ouro
+- Consome 1 **Poção de Vida** do inventário stackável
 - Cura: 40% do HP máximo
 - Disponível a qualquer momento durante o combate
 
@@ -126,6 +129,16 @@ A cada level-up o jogador recebe 1 ponto para alocar (permanente, sem refund):
 
 **Chefes** aparecem a cada **10 abates** na zona. São sinalizados com ⚠️ na interface.
 
+### Drops por monstro *(implementado)*
+- Cada monstro possui um arquivo dedicado com sua tabela de drops.
+- Cada entrada de drop define:
+	- `itemId`
+	- `chance` (0 a 1)
+	- `minQuantity` e `maxQuantity` (opcional)
+- Itens stackáveis (ex.: Poção de Vida e Gold) podem cair com quantidade > 1.
+- Drops de equipamento continuam indo para o inventário de equipamentos.
+- Drops de currency (`gold_coin`) são convertidos em ouro imediatamente.
+
 ---
 
 ## 5. Itens e Equipamentos
@@ -144,7 +157,7 @@ A cada level-up o jogador recebe 1 ponto para alocar (permanente, sem refund):
 | Epic | Roxo | 12% |
 | Legendary | Dourado | 3% |
 
-> Chance base de drop por vitória: **15%**. A raridade é sorteada pelos pesos acima dentro do pool elegível pelo nível do herói.
+> As raridades seguem disponíveis no jogo e UI, mas o drop agora é orientado por tabela de cada monstro.
 
 ### Armas
 
@@ -186,8 +199,13 @@ A cada level-up o jogador recebe 1 ponto para alocar (permanente, sem refund):
 | 🔮 Anel do Poder | Epic | 10 | +15 ATK, +6 CRIT |
 
 ### Como obter itens
-- **Drop aleatório** (15% de chance por vitória, raridade ponderada) — filtra por `requiredLevel ≤ nível atual`
+- **Drops por monstro** com chances/quantidades específicas por item
 - **Compra no Mercado** — de outros jogadores
+
+### Itens stackáveis *(implementado)*
+- **Poção de Vida** (`healing_potion`): item consumível stackável
+- **Gold** (`gold_coin`): recurso stackável usado em drops
+- Inventário stackável é separado do inventário de equipamentos
 
 ### Como usar itens
 - Aba **Bolsa** → botão "Equipar" — substitui o slot automaticamente
@@ -237,6 +255,7 @@ Dois rankings públicos (sem precisar de login):
 - Indicadores no header: `↻` (sinc), `✓` (ok), `✗` (erro)
 - Se o herói não existir na API ainda, ele é criado automaticamente na primeira sync
 - Anti-cheat básico: rejeita se o nível subir mais de 5 por sync
+- O cliente já envia também o estado de stackáveis; persistência server-side completa ainda pendente
 
 ### Rate Limiting
 - **100 req/min por IP** — respostas com `HTTP 429` e header `Retry-After: 60`
@@ -255,8 +274,9 @@ Dois rankings públicos (sem precisar de login):
 |---|---|
 | ⚔️ Batalha | Arena, HP bars, log de combate, botões Auto/Poção |
 | 🧙 Herói | Stats, XP, equipamento atual, ouro, painel de Skill Points |
-| 🎒 Bolsa | Inventário com botões Equipar e Vender (logado) |
+| 🎒 Bolsa | Inventário de equipamentos + seção de stackáveis (consumíveis/recursos) |
 | 🗺️ Zonas | Seletor de zona, links para Rankings/Shop, Reset |
+| 👤 Perfil | Dados do herói e rename |
 
 ### Site público
 | Página | Conteúdo |
@@ -275,7 +295,7 @@ Dois rankings públicos (sem precisar de login):
 - [ ] **Habilidades ativas** — ataques especiais, magias, buffs consumindo MP
 - [ ] **MP** existe como stat mas não é usado no combate
 - [ ] **Mais zonas** — só 3 zonas, teto de progressão baixo
-- [ ] **Mais itens** — apenas 20 itens no pool, sem legendários de zona 3
+- [ ] **Mais itens** — catálogo ainda enxuto para progressão longa
 - [ ] **Set de classe** — itens com bônus específicos por classe
 - [ ] **Sistema de encantamento** — melhorar itens com ouro/materiais
 - [ ] **Missões/Quests** — objetivos diários ou por zona
@@ -289,6 +309,7 @@ Dois rankings públicos (sem precisar de login):
 ### Online / Multiplayer
 - [ ] **Anti-cheat fraco** — apenas valida delta de nível, não valida XP/ouro
 - [ ] **WebSocket subutilizado** — implementado mas não usado no frontend (rankings em tempo real)
+- [ ] **Persistência server-side de stackáveis** — payload já é enviado, falta salvar/recuperar no backend
 - [ ] **Party/Grupo** — cooperação entre jogadores
 - [ ] **PvP** — duelos entre heróis
 - [ ] **Guild** — clãs com ranking coletivo
@@ -318,6 +339,17 @@ Dois rankings públicos (sem precisar de login):
 ---
 
 ## Histórico de versões
+
+### v0.3.0
+- Refatoração de dados do jogo para estrutura modular por domínio:
+	- itens em pasta dedicada com 1 arquivo por item
+	- monstros em pasta dedicada com 1 arquivo por monstro
+	- classes em pasta dedicada com arquivos `.js` individuais
+- Tabela de drops por monstro com chance e quantidade por item
+- Suporte a itens stackáveis (Poção de Vida e Gold)
+- Inventário stackável separado do inventário de equipamentos
+- Consumo de poção no combate agora usa estoque de poções, sem custo direto de ouro
+- Catálogos centralizados com agregadores para itens, monstros e classes
 
 ### v0.2.0
 - Skill Points funcionais: alocação permanente de pontos em ATK/DEF/HP/VEL a cada level-up

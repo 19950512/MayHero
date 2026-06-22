@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { RARITY_COLORS } from '../game/data'
+import { ITEM_BY_ID } from '../game/data'
 import { api } from '../lib/api'
 import type { Equipment } from '../game/types'
 
@@ -23,7 +24,7 @@ interface ListingForm {
 }
 
 export function Inventory() {
-  const { inventory, hero, equipItemFromInventory, currentZone } = useGameStore()
+  const { inventory, hero, equipItemFromInventory, currentZone, stackableInventory } = useGameStore()
   const { user } = useAuthStore()
   const [form, setForm] = useState<ListingForm | null>(null)
 
@@ -54,6 +55,7 @@ export function Inventory() {
         gold: hero.gold, totalKills: hero.totalKills, skillPoints: hero.skillPoints,
         currentZone, stats: hero.stats, baseStats: hero.baseStats,
         equipment: hero.equipment, inventory,
+        stackableInventory,
       }
       try {
         await api.hero.sync(syncData as Record<string, unknown>)
@@ -85,6 +87,27 @@ export function Inventory() {
   return (
     <div className="flex flex-col gap-2 h-full overflow-y-auto">
       <p className="text-white/40 text-xs uppercase font-bold">Inventário ({inventory.length})</p>
+
+      {Object.entries(stackableInventory).some(([, qty]) => qty > 0) && (
+        <div className="bg-slate-900/40 rounded-lg border border-white/10 p-2.5">
+          <p className="text-white/45 text-xs uppercase font-bold mb-2">Consumíveis e Recursos</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stackableInventory)
+              .filter(([, qty]) => qty > 0)
+              .map(([itemId, qty]) => {
+                const item = ITEM_BY_ID[itemId]
+                return (
+                  <div key={itemId} className="px-2 py-1 rounded-md border border-white/10 bg-black/30 text-xs text-white/80 flex items-center gap-1.5">
+                    <span>{item?.icon ?? '•'}</span>
+                    <span>{item?.name ?? itemId}</span>
+                    <span className="text-amber-300 font-bold">x{qty}</span>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
       {inventory.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-white/20 text-sm text-center">

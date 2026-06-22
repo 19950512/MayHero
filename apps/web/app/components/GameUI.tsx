@@ -26,7 +26,8 @@ const SYNC_INTERVAL_MS = 30_000
 export function GameUI() {
   const [activeTab, setActiveTab] = useState<Tab>('battle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
-  const { hero, tick, notifications, dismissNotification, resetGame, inventory, currentZone, killsInZone } = useGameStore()
+  const [showNotifications, setShowNotifications] = useState(true)
+  const { hero, tick, notifications, dismissNotification, resetGame, inventory, stackableInventory, currentZone, killsInZone } = useGameStore()
   const { user, logout } = useAuthStore()
   const lastSyncRef = useRef<number>(0)
 
@@ -63,6 +64,7 @@ export function GameUI() {
       baseStats: hero.baseStats,
       equipment: hero.equipment,
       inventory,
+      stackableInventory,
     }
 
     setSyncStatus('syncing')
@@ -88,7 +90,7 @@ export function GameUI() {
         .finally(() => setTimeout(() => setSyncStatus('idle'), 3000))
 
     doSync()
-  }, [killsInZone, hero, user, inventory, currentZone])
+  }, [killsInZone, hero, user, inventory, stackableInventory, currentZone])
 
   const electronApi = typeof window !== 'undefined'
     ? (window as Window & { electronAPI?: { isElectron?: boolean; closeWindow?: () => void } }).electronAPI
@@ -117,6 +119,19 @@ export function GameUI() {
               {syncStatus === 'syncing' ? 'Sinc...' : syncStatus === 'ok' ? 'Sinc OK' : syncStatus === 'error' ? 'Sinc ERR' : 'Sinc'}
             </span>
           )}
+          <button
+            onClick={() => setShowNotifications(v => !v)}
+            className="relative w-6 h-6 rounded-md bg-amber-100/10 hover:bg-amber-100/20 flex items-center justify-center text-amber-100/70 hover:text-amber-50 text-xs transition-colors"
+            title={showNotifications ? 'Ocultar notificações' : 'Mostrar notificações'}
+            aria-label={showNotifications ? 'Ocultar notificações' : 'Mostrar notificações'}
+          >
+            {showNotifications ? '◉' : '○'}
+            {!showNotifications && notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-600 text-[10px] leading-4 font-bold text-amber-50">
+                {Math.min(notifications.length, 9)}
+              </span>
+            )}
+          </button>
           <span className="text-amber-300 text-xs font-bold">Ouro {hero.gold}</span>
           {!user && (
             <Link href="/login" className="text-amber-200 text-xs hover:text-amber-100">Entrar</Link>
@@ -136,7 +151,7 @@ export function GameUI() {
       </div>
 
       {/* Notifications */}
-      {notifications.length > 0 && (
+      {showNotifications && notifications.length > 0 && (
         <div className="absolute top-10 right-3 z-50 flex flex-col gap-1 pointer-events-none">
           {notifications.map(n => (
             <div

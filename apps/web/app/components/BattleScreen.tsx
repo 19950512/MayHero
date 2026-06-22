@@ -6,7 +6,7 @@ import { HeroSprite } from './HeroSprite'
 import { EnemySprite } from './EnemySprite'
 
 export function BattleScreen() {
-  const { hero, battle, autoFight, toggleAutoFight, usePotion } = useGameStore()
+  const { hero, battle, autoFight, toggleAutoFight, usePotion, stackableInventory } = useGameStore()
   const logsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function BattleScreen() {
 
   const isHeroAttacking = battle.logs.at(-1)?.actor === 'hero' && battle.phase === 'fighting'
   const isEnemyAttacking = battle.logs.at(-1)?.actor === 'enemy' && battle.phase === 'fighting'
-  const potionCost = 10 + hero.level * 2
+  const potionCount = stackableInventory.healing_potion ?? 0
 
   return (
     <div className="flex flex-col gap-3 h-full">
@@ -107,10 +107,10 @@ export function BattleScreen() {
         </button>
         <button
           onClick={usePotion}
-          disabled={hero.gold < potionCost || hero.stats.hp >= hero.stats.maxHp}
+          disabled={potionCount <= 0 || hero.stats.hp >= hero.stats.maxHp}
           className="flex-1 py-2 rounded-lg text-xs font-bold bg-amber-800 hover:bg-amber-700 disabled:opacity-30 disabled:cursor-not-allowed text-amber-50 transition-colors"
         >
-          Poção ({potionCost} ouro)
+          Poção ({potionCount})
         </button>
       </div>
     </div>

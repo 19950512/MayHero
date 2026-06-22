@@ -28,6 +28,7 @@ interface GameState {
   battle: BattleState
   currentZone: number
   inventory: Equipment[]
+  stackableInventory: Record<string, number>
   notifications: Notification[]
   autoFight: boolean
   gameStarted: boolean
@@ -66,6 +67,7 @@ export const useGameStore = create<GameState>()(
       battle: IDLE_BATTLE_STATE,
       currentZone: 1,
       inventory: [],
+      stackableInventory: {},
       notifications: [],
       autoFight: true,
       gameStarted: false,
@@ -80,6 +82,7 @@ export const useGameStore = create<GameState>()(
           currentZone: 1,
           killsInZone: 0,
           inventory: [],
+          stackableInventory: {},
           notifications: [],
         })
       },
@@ -132,7 +135,7 @@ export const useGameStore = create<GameState>()(
           const newLogs = [...battle.logs, ...result.logs].slice(-MAX_LOGS)
 
           if (result.phase === 'victory') {
-            const { hero: updatedHero, goldEarned, xpEarned, leveledUp, itemDrop } = applyVictory(hero, battle.enemy)
+            const { hero: updatedHero, goldEarned, xpEarned, leveledUp, itemDrop, stackableDrops } = applyVictory(hero, battle.enemy)
             const newNotifs: Notification[] = [
               { id: `xp-${now}`, message: `+${xpEarned} XP`, type: 'xp' },
               { id: `gold-${now}`, message: `+${goldEarned} ouro`, type: 'gold' },
@@ -140,9 +143,19 @@ export const useGameStore = create<GameState>()(
             if (leveledUp) newNotifs.push({ id: `lvl-${now}`, message: `Nível ${updatedHero.level}!`, type: 'levelup' })
 
             const newInventory = [...get().inventory]
+            const newStackableInventory = { ...get().stackableInventory }
             if (itemDrop) {
               newInventory.push(itemDrop)
               newNotifs.push({ id: `item-${now}`, message: `Drop: ${itemDrop.name}`, type: 'item' })
+            }
+
+            for (const stackDrop of stackableDrops) {
+              newStackableInventory[stackDrop.itemId] = (newStackableInventory[stackDrop.itemId] ?? 0) + stackDrop.quantity
+              newNotifs.push({
+                id: `item-${now}-${stackDrop.itemId}`,
+                message: `Drop: ${stackDrop.name} x${stackDrop.quantity}`,
+                type: 'item',
+              })
             }
 
             set({
@@ -157,6 +170,7 @@ export const useGameStore = create<GameState>()(
               },
               killsInZone: killsInZone + 1,
               inventory: newInventory,
+              stackableInventory: newStackableInventory,
               notifications: [...get().notifications, ...newNotifs].slice(-5),
             })
           } else if (result.phase === 'defeat') {
@@ -213,14 +227,22 @@ export const useGameStore = create<GameState>()(
         set(s => ({ notifications: s.notifications.filter(n => n.id !== id) })),
 
       usePotion: () => {
-        const { hero } = get()
+        const { hero, stackableInventory } = get()
         if (!hero) return
-        const potionCost = 10 + hero.level * 2
-        if (hero.gold < potionCost) return
+        const potionCount = stackableInventory.healing_potion ?? 0
+        if (potionCount <= 0) return
+
         const stats = computeStats(hero)
+        if (hero.stats.hp >= stats.maxHp) return
+
         const healAmt = Math.floor(stats.maxHp * 0.4)
         const healed = healHero(hero, healAmt)
-        set({ hero: { ...healed, gold: healed.gold - potionCost } })
+        const newStackableInventory = { ...stackableInventory }
+        const remaining = potionCount - 1
+        if (remaining <= 0) delete newStackableInventory.healing_potion
+        else newStackableInventory.healing_potion = remaining
+
+        set({ hero: healed, stackableInventory: newStackableInventory })
       },
 
       spendSkillPoint: (stat) => {
@@ -242,6 +264,7 @@ export const useGameStore = create<GameState>()(
           battle: IDLE_BATTLE_STATE,
           currentZone: 1,
           inventory: [],
+          stackableInventory: {},
           notifications: [],
           autoFight: true,
           gameStarted: false,
@@ -255,6 +278,7 @@ export const useGameStore = create<GameState>()(
         hero: state.hero,
         currentZone: state.currentZone,
         inventory: state.inventory,
+        stackableInventory: state.stackableInventory,
         gameStarted: state.gameStarted,
         killsInZone: state.killsInZone,
         autoFight: state.autoFight,

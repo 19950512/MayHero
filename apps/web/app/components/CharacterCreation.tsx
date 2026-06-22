@@ -6,16 +6,8 @@ import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { api } from '../lib/api'
 import { BASE_STATS } from '../game/data'
+import { HERO_CLASSES } from '../game/classes'
 import type { HeroClass } from '../game/types'
-
-const CLASS_DESCRIPTIONS: Record<HeroClass, { name: string; desc: string; color: string; sigil: string }> = {
-  warrior: { name: 'Guerreiro',     sigil: 'GU', desc: 'Linha de frente versátil. Equilíbrio entre ataque e defesa.',              color: 'border-amber-600/70 bg-amber-950/40' },
-  archer:  { name: 'Arqueiro',      sigil: 'AR', desc: 'Alta velocidade e crítico. Desfere golpes certeiros à distância.',         color: 'border-green-600/70 bg-green-950/30' },
-  mage:    { name: 'Sorcerer',      sigil: 'MA', desc: 'Poder arcano supremo. Frágil mas de dano devastador.',                      color: 'border-cyan-600/70 bg-cyan-950/30' },
-  knight:  { name: 'Knight',        sigil: 'KN', desc: 'Fortaleza viva em armadura pesada. Excelência em sobrevivência.',           color: 'border-stone-400/70 bg-stone-800/40' },
-  paladin: { name: 'Paladin',       sigil: 'PA', desc: 'Guerreiro sagrado com luz divina. Equilíbrio entre força e proteção.',      color: 'border-yellow-500/70 bg-yellow-950/30' },
-  druid:   { name: 'Druid',         sigil: 'DR', desc: 'Manipulador da natureza. Alto dano mágico com mobilidade sobrenatural.',     color: 'border-emerald-500/70 bg-emerald-950/30' },
-}
 
 export function CharacterCreation() {
   const [name, setName] = useState('')
@@ -101,8 +93,8 @@ export function CharacterCreation() {
       <div>
         <label className="text-amber-100/70 text-xs uppercase font-bold mb-1.5 block tracking-wide">Ordem de Combate</label>
         <div className="flex flex-col gap-2">
-          {(Object.keys(CLASS_DESCRIPTIONS) as HeroClass[]).map(cls => {
-            const info = CLASS_DESCRIPTIONS[cls]
+          {HERO_CLASSES.map(info => {
+            const cls = info.id
             const selected = selectedClass === cls
             return (
               <button
@@ -110,14 +102,14 @@ export function CharacterCreation() {
                 onClick={() => setSelectedClass(cls)}
                 className={`
                   w-full rounded-xl p-3 text-left border-2 transition-all
-                  ${selected ? info.color : 'border-amber-100/10 bg-[#17110d]/70 hover:bg-[#21180f]/80'}
+                  ${selected ? info.themeColor : 'border-amber-100/10 bg-[#17110d]/70 hover:bg-[#21180f]/80'}
                 `}
               >
                 <div className="flex items-center gap-3">
                   <span className="w-9 h-9 rounded-full border border-amber-200/30 bg-amber-900/30 flex items-center justify-center text-[11px] font-bold tracking-widest shrink-0">{info.sigil}</span>
                   <div>
                     <p className="text-amber-50 font-bold text-sm tracking-wide">{info.name}</p>
-                    <p className="text-amber-100/55 text-xs">{info.desc}</p>
+                    <p className="text-amber-100/55 text-xs">{info.description}</p>
                   </div>
                   {selected && <span className="ml-auto text-amber-200/80 text-xs uppercase tracking-wider">ativa</span>}
                 </div>
