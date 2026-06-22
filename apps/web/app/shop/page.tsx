@@ -36,7 +36,7 @@ export default function ShopPage() {
   const [buying, setBuying] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const { user, logout } = useAuthStore()
-  const { addInventoryItem } = useGameStore()
+  const { addInventoryItem, hero } = useGameStore()
 
   const toEquipment = (value: unknown): Equipment | null => {
     if (!value || typeof value !== 'object') return null
@@ -110,7 +110,13 @@ export default function ShopPage() {
       <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
-          <div className="flex gap-3 text-sm items-center">
+          <div className="flex gap-4 text-sm items-center">
+            {user && hero && (
+              <div className="flex items-center gap-1">
+                <span className="text-amber-100/60">Ouro</span>
+                <span className="text-amber-300 font-bold">{hero.gold}</span>
+              </div>
+            )}
             <Link href="/rankings" className="text-amber-100/55 hover:text-amber-100">Rankings</Link>
             {user ? (
               <>

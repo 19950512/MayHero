@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { api } from '../lib/api'
 import { CLASS_ICONS } from '../game/data'
 import { useAuthStore } from '../store/authStore'
+import { useGameStore } from '../store/gameStore'
 
 type RankHero = {
   id: string
@@ -37,6 +38,7 @@ export default function RankingsPage() {
   const [rankings, setRankings] = useState<RankHero[]>([])
   const [loading, setLoading] = useState(true)
   const { user, logout } = useAuthStore()
+  const { hero } = useGameStore()
 
   useEffect(() => {
     const fetcher = tab === 'level' ? api.rankings.byLevel : api.rankings.byKills
@@ -54,7 +56,19 @@ export default function RankingsPage() {
       <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
-          <div className="flex gap-3 text-sm items-center">
+          <div className="flex gap-4 text-sm items-center">
+            {user && hero && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <span className="text-amber-100/60">Nível</span>
+                  <span className="text-amber-200 font-bold">{hero.level}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-amber-100/60">XP</span>
+                  <span className="text-blue-300 font-semibold">{hero.xp}/{hero.xpToNext}</span>
+                </div>
+              </div>
+            )}
             <Link href="/shop" className="text-amber-100/55 hover:text-amber-100">Mercado</Link>
             {user ? (
               <>
