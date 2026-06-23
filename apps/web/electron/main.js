@@ -13,7 +13,6 @@ let staticServerUrl = null
 const OUT_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'out')
   : path.join(__dirname, '../out')
-const externalSiteUrl = process.env.EXTERNAL_SITE_URL || process.env.WEB_URL || 'http://localhost:3069'
 const hideOnBlur = process.env.MAYHERO_HIDE_ON_BLUR === 'true'
 const trayMode = process.env.MAYHERO_TRAY_MODE !== 'false'
 const LOG_FILE = path.join(os.homedir(), '.config', 'May Hero', 'electron.log')
@@ -247,8 +246,9 @@ app.whenReady().then(async () => {
       tray.setToolTip('May Hero')
 
       const contextMenu = Menu.buildFromTemplate([
-        { label: 'Abrir Site', click: () => { void shell.openExternal(externalSiteUrl) } },
-        { label: 'Fechar o jogo', click: () => app.quit() },
+        { label: 'Acessar Site', click: () => { void shell.openExternal('https://mayhero.com.br') } },
+        { type: 'separator' },
+        { label: 'Encerrar Jogo', click: () => { app.quit(); setTimeout(() => process.exit(0), 1000) } },
       ])
 
       tray.on('click', () => { void toggleWindow() })

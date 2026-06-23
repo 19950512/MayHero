@@ -46,9 +46,20 @@ const SyncHeroBody = z.object({
 
 const NpcSellBody = z.object({
   npcId: z.string().min(1),
-  itemId: z.string().min(1),
-  quantity: z.number().int().min(1).max(9999),
+  inventoryItemIds: z.array(z.string().min(1)).min(1).max(99),
 })
+
+function getEquippedInventoryItemIds(equipJson: unknown): Set<string> {
+  const ids = new Set<string>()
+  if (!equipJson || typeof equipJson !== 'object') return ids
+  for (const slot of Object.values(equipJson as Record<string, unknown>)) {
+    if (slot && typeof slot === 'object') {
+      const iid = (slot as Record<string, unknown>).inventoryItemId
+      if (typeof iid === 'string') ids.add(iid)
+    }
+  }
+  return ids
+}
 
 // Mirrors the client-side NPC buy lists — only equipment items need server-side removal
 const NPC_BUY_CATALOG: Record<string, Array<{ itemId: string; price: number }>> = {
@@ -108,7 +119,7 @@ export async function heroRoutes(app: FastifyInstance) {
     if (!hero) return []
     return prisma.inventoryItem.findMany({
       where: { heroId: hero.id },
-      select: { id: true, itemData: true },
+      select: { id: true, itemData: true, listing: { select: { soldAt: true } } },
     })
   })
 
@@ -116,7 +127,7 @@ export async function heroRoutes(app: FastifyInstance) {
     const { sub } = req.user as { sub: string }
     const hero = await prisma.hero.findUnique({
       where: { userId: sub },
-      include: { inventory: true },
+      include: { inventory: { include: { listing: { select: { soldAt: true } } } } },
     })
     if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
     return hero
@@ -230,31 +241,46 @@ export async function heroRoutes(app: FastifyInstance) {
     const catalog = NPC_BUY_CATALOG[body.data.npcId]
     if (!catalog) return reply.status(400).send({ error: 'NPC não encontrado.' })
 
-    const entry = catalog.find(e => e.itemId === body.data.itemId)
-    if (!entry) return reply.status(400).send({ error: 'NPC não compra este item.' })
-
     const hero = await prisma.hero.findUnique({ where: { userId: sub } })
     if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
 
-    const allItems = await prisma.inventoryItem.findMany({
-      where: { heroId: hero.id },
+    // Fetch the exact items by UUID, all must belong to this hero
+    const items = await prisma.inventoryItem.findMany({
+      where: { id: { in: body.data.inventoryItemIds }, heroId: hero.id },
       select: { id: true, itemData: true },
     })
 
-    const matching = allItems.filter((item: { id: string; itemData: unknown }) => {
-      const data = item.itemData as Record<string, unknown>
-      return data.id === body.data.itemId
-    })
-
-    if (matching.length < body.data.quantity) {
-      return reply.status(400).send({ error: `Você possui apenas ${matching.length}.` })
+    if (items.length !== body.data.inventoryItemIds.length) {
+      return reply.status(400).send({ error: 'Um ou mais itens não encontrados no inventário.' })
     }
 
-    const toDelete = matching.slice(0, body.data.quantity).map((i: { id: string }) => i.id)
-    const totalEarned = entry.price * body.data.quantity
+    // All items must be the same type and that type must be in the NPC catalog
+    const typeIds = new Set(items.map((i: { id: string; itemData: unknown }) => (i.itemData as Record<string, unknown>).id as string))
+    if (typeIds.size !== 1) {
+      return reply.status(400).send({ error: 'Apenas itens do mesmo tipo podem ser vendidos juntos.' })
+    }
+    const itemTypeId = [...typeIds][0]
+    const entry = catalog.find(e => e.itemId === itemTypeId)
+    if (!entry) return reply.status(400).send({ error: 'NPC não compra este item.' })
+
+    // None can have an active shop listing
+    const listed = await prisma.shopListing.count({
+      where: { inventoryItemId: { in: body.data.inventoryItemIds }, soldAt: null },
+    })
+    if (listed > 0) {
+      return reply.status(400).send({ error: 'Um ou mais itens estão anunciados na loja. Remova o anúncio antes de vender.' })
+    }
+
+    // None can be currently equipped
+    const equippedIds = getEquippedInventoryItemIds(hero.equipJson)
+    if (body.data.inventoryItemIds.some(id => equippedIds.has(id))) {
+      return reply.status(400).send({ error: 'Não é possível vender itens equipados ao NPC.' })
+    }
+
+    const totalEarned = entry.price * body.data.inventoryItemIds.length
 
     const updatedHero = await prisma.$transaction(async (tx: typeof prisma) => {
-      await tx.inventoryItem.deleteMany({ where: { id: { in: toDelete } } })
+      await tx.inventoryItem.deleteMany({ where: { id: { in: body.data.inventoryItemIds } } })
       return tx.hero.update({
         where: { id: hero.id },
         data: { gold: { increment: totalEarned } },
@@ -403,6 +429,8 @@ export async function heroRoutes(app: FastifyInstance) {
           hp: Math.max(1, Math.min(stats.maxHp, body.data.heroHpAfterBattle ?? stats.hp)),
         }
 
+    let itemDropInventoryId: string | null = null
+
     const updatedHero = await prisma.$transaction(async (tx: typeof prisma) => {
       const savedHero = await tx.hero.update({
         where: { id: hero.id },
@@ -419,7 +447,8 @@ export async function heroRoutes(app: FastifyInstance) {
       })
 
       if (itemDrop) {
-        await tx.inventoryItem.create({ data: { heroId: hero.id, itemData: itemDrop as object } })
+        const created = await tx.inventoryItem.create({ data: { heroId: hero.id, itemData: itemDrop as object } })
+        itemDropInventoryId = created.id
       }
 
       return savedHero
@@ -444,7 +473,9 @@ export async function heroRoutes(app: FastifyInstance) {
         xpEarned,
         goldEarned: totalGoldEarned,
         leveledUp,
-        itemDrop,
+        itemDrop: itemDrop && itemDropInventoryId
+          ? { ...itemDrop, inventoryItemId: itemDropInventoryId }
+          : itemDrop,
         stackableDrops,
       },
       serverState: {

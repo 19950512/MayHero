@@ -29,6 +29,12 @@ interface Notification {
   type: 'xp' | 'gold' | 'levelup' | 'item' | 'defeat' | 'info'
 }
 
+interface ServerInventoryItem {
+  id: string
+  itemData: Record<string, unknown>
+  listing?: { soldAt: string | null } | null
+}
+
 interface ServerHeroPayload {
   name: string
   class: string
@@ -42,6 +48,7 @@ interface ServerHeroPayload {
   statsJson: Record<string, unknown>
   baseStatsJson: Record<string, unknown>
   equipJson: Record<string, unknown>
+  inventory?: ServerInventoryItem[]
 }
 
 interface GameState {
@@ -80,7 +87,7 @@ interface GameState {
   buyFromNpcStore: (itemId: string, quantity: number) => { ok: boolean; error?: string }
   buyFromNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
   sellToNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
-  applyNpcEquipmentSell: (itemId: string, quantity: number, newGold: number) => void
+  applyNpcEquipmentSell: (inventoryItemIds: string[], newGold: number) => void
   startServerEncounter: (payload: { encounterId: string; enemyId: string }) => void
   applyServerVictoryResolution: (payload: {
     hero: {
@@ -159,7 +166,8 @@ export const useGameStore = create<GameState>()(
           equipment: { head: undefined, body: undefined, legs: undefined, boots: undefined, offhand: undefined, mainhand: undefined },
           pets: { pet1: undefined, pet2: undefined },
         }
-        set({
+
+        const nextState: Partial<GameState> = {
           hero: {
             name: data.name,
             class: data.class as Hero['class'],
@@ -180,7 +188,60 @@ export const useGameStore = create<GameState>()(
           battle: IDLE_BATTLE_STATE,
           notifications: [],
           battleEncounterId: null,
-        })
+        }
+
+        if (data.inventory) {
+          // Collect equipped inventoryItemIds (new-style) and equipped type counts (legacy fallback)
+          const equippedIds = new Set<string>()
+          const equippedTypeCounts: Record<string, number> = {}
+          for (const slot of Object.values(equipRaw)) {
+            if (slot && typeof slot === 'object') {
+              const s = slot as Record<string, unknown>
+              if (typeof s.inventoryItemId === 'string') {
+                equippedIds.add(s.inventoryItemId)
+              } else if (typeof s.id === 'string') {
+                const key = `${s.id}:${s.enhancement ?? 0}`
+                equippedTypeCounts[key] = (equippedTypeCounts[key] ?? 0) + 1
+              }
+            }
+          }
+          const remainingCounts = { ...equippedTypeCounts }
+
+          const newInventory: Equipment[] = []
+          for (const invItem of data.inventory) {
+            const raw = invItem.itemData
+            if (
+              typeof raw.id !== 'string' || typeof raw.name !== 'string' ||
+              typeof raw.slot !== 'string' || typeof raw.rarity !== 'string' ||
+              typeof raw.icon !== 'string' || typeof raw.requiredLevel !== 'number' ||
+              !raw.bonuses || typeof raw.bonuses !== 'object'
+            ) continue
+            if (!['weapon', 'armor', 'helm', 'ring'].includes(raw.slot as string)) continue
+
+            // Skip items on active market listings
+            if (invItem.listing && invItem.listing.soldAt === null) continue
+
+            if (equippedIds.has(invItem.id)) continue
+
+            const key = `${raw.id}:${raw.enhancement ?? 0}`
+            if (remainingCounts[key] > 0) { remainingCounts[key]--; continue }
+
+            newInventory.push({
+              id: raw.id as string,
+              inventoryItemId: invItem.id,
+              name: raw.name as string,
+              slot: raw.slot as Equipment['slot'],
+              rarity: raw.rarity as Equipment['rarity'],
+              bonuses: raw.bonuses as Equipment['bonuses'],
+              icon: raw.icon as string,
+              requiredLevel: raw.requiredLevel as number,
+              enhancement: typeof raw.enhancement === 'number' ? raw.enhancement : undefined,
+            })
+          }
+          nextState.inventory = newInventory
+        }
+
+        set(nextState as GameState)
       },
 
       startGame: (name, heroClass) => {
@@ -361,11 +422,14 @@ export const useGameStore = create<GameState>()(
         const { hero, inventory } = get()
         if (!hero) return
         const { hero: updatedHero, replacedItem } = equipItem(hero, item)
-        const matchIdx = inventory.findIndex(i =>
-          i.id === item.id && i.slot === item.slot &&
-          i.rarity === item.rarity && i.name === item.name &&
-          (i.enhancement ?? 0) === (item.enhancement ?? 0)
-        )
+        // Prefer UUID match; fall back to type+slot+rarity+enhancement for legacy items
+        const matchIdx = item.inventoryItemId
+          ? inventory.findIndex(i => i.inventoryItemId === item.inventoryItemId)
+          : inventory.findIndex(i =>
+              i.id === item.id && i.slot === item.slot &&
+              i.rarity === item.rarity && i.name === item.name &&
+              (i.enhancement ?? 0) === (item.enhancement ?? 0)
+            )
         const newInventory = matchIdx !== -1
           ? [...inventory.slice(0, matchIdx), ...inventory.slice(matchIdx + 1)]
           : [...inventory]
@@ -537,14 +601,11 @@ export const useGameStore = create<GameState>()(
         return { ok: true }
       },
 
-      applyNpcEquipmentSell: (itemId, quantity, newGold) => {
+      applyNpcEquipmentSell: (inventoryItemIds, newGold) => {
         const { hero, inventory } = get()
         if (!hero) return
-        let removed = 0
-        const newInventory = inventory.filter(i => {
-          if (i.id === itemId && removed < quantity) { removed++; return false }
-          return true
-        })
+        const toRemove = new Set(inventoryItemIds)
+        const newInventory = inventory.filter(i => !i.inventoryItemId || !toRemove.has(i.inventoryItemId))
         set({ hero: { ...hero, gold: newGold }, inventory: newInventory })
       },
 

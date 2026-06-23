@@ -9,6 +9,7 @@ export type HeroClass = 'warrior' | 'archer' | 'mage' | 'paladin' | 'druid' | 'k
 
 export interface Equipment {
   id: string
+  inventoryItemId?: string
   name: string
   slot: 'weapon' | 'armor' | 'helm' | 'ring'
   rarity: 'common' | 'rare' | 'epic' | 'legendary'

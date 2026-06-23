@@ -62,10 +62,33 @@ export function Inventory({ onComposeMail }: Props) {
           await api.hero.sync(syncData as Record<string, unknown>)
         } else throw e
       }
-      const dbItems = await api.hero.inventory()
-      const dbItem = dbItems.find(di => di.itemData.id === item.id && di.itemData.slot === item.slot && di.itemData.rarity === item.rarity)
-      if (!dbItem) throw new Error('Item não encontrado no servidor.')
-      await api.shop.listItem(dbItem.id, price)
+      let inventoryItemId = item.inventoryItemId
+      if (!inventoryItemId) {
+        // Legacy fallback: fetch from server, skip items that already have an active listing
+        const dbItems = await api.hero.inventory()
+        const dbItem = dbItems.find(di =>
+          di.itemData.id === item.id &&
+          di.itemData.slot === item.slot &&
+          di.itemData.rarity === item.rarity &&
+          (!di.listing || di.listing.soldAt !== null)
+        )
+        if (!dbItem) throw new Error('Item não encontrado no servidor.')
+        inventoryItemId = dbItem.id
+      }
+      await api.shop.listItem(inventoryItemId, price)
+      // Remove from client inventory so the same item can't be re-listed
+      if (item.inventoryItemId) {
+        replaceInventory(inventory.filter(i => i.inventoryItemId !== item.inventoryItemId))
+      } else {
+        let removed = false
+        replaceInventory(inventory.filter(i => {
+          if (!removed && i.id === item.id && i.slot === item.slot && i.rarity === item.rarity && !i.inventoryItemId) {
+            removed = true
+            return false
+          }
+          return true
+        }))
+      }
       setSellItem(null)
       setDetailItem(null)
     } catch (e) {

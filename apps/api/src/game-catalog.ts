@@ -28,6 +28,7 @@ type EquipmentBonuses = Partial<{
 
 export interface EquipmentItemData {
   id: string
+  inventoryItemId?: string
   name: string
   slot: EquipmentSlot
   rarity: Rarity
@@ -197,22 +198,6 @@ export function resolveMonsterDrops(enemyId: string): Array<{ item: CatalogItem;
   return drops
 }
 
-function sameBonuses(input: unknown, expected: EquipmentBonuses): boolean {
-  if (input === undefined || input === null) return false
-  if (typeof input !== 'object') return false
-
-  const inObj = input as Record<string, unknown>
-  const expectedKeys = Object.keys(expected)
-  const inputKeys = Object.keys(inObj)
-  if (inputKeys.length !== expectedKeys.length) return false
-
-  for (const key of expectedKeys) {
-    if (typeof inObj[key] !== 'number') return false
-    if (Number(inObj[key]) !== Number(expected[key as keyof EquipmentBonuses])) return false
-  }
-
-  return true
-}
 
 export function normalizeEquipmentItemData(input: unknown): EquipmentItemData | null {
   if (!input || typeof input !== 'object') return null
@@ -223,12 +208,10 @@ export function normalizeEquipmentItemData(input: unknown): EquipmentItemData | 
   const canonical = EQUIPMENT_BY_ID.get(data.id)
   if (!canonical) return null
 
-  if (data.slot !== undefined && data.slot !== canonical.slot) return null
-  if (data.rarity !== undefined && data.rarity !== canonical.rarity) return null
-  if (data.requiredLevel !== undefined && Number(data.requiredLevel) !== canonical.requiredLevel) return null
-  if (data.name !== undefined && data.name !== canonical.name) return null
-  if (data.icon !== undefined && data.icon !== canonical.icon) return null
-  if (data.bonuses !== undefined && !sameBonuses(data.bonuses, canonical.bonuses)) return null
+  // Only validate id (already done above) and enhancement level.
+  // Cosmetic fields (name, icon, bonuses, slot, rarity) are always overwritten
+  // by canonical values, so checking them would break syncs when the catalog
+  // is updated (e.g. icons changed, sprites added).
 
   const enhancementRaw = data.enhancement
   const enhancement = enhancementRaw === undefined || enhancementRaw === null
@@ -238,8 +221,11 @@ export function normalizeEquipmentItemData(input: unknown): EquipmentItemData | 
       : null
   if (enhancement === null) return null
 
+  const inventoryItemId = typeof data.inventoryItemId === 'string' ? data.inventoryItemId : undefined
+
   return {
     id: canonical.id,
+    ...(inventoryItemId !== undefined ? { inventoryItemId } : {}),
     name: canonical.name,
     slot: canonical.slot,
     rarity: canonical.rarity,
@@ -266,25 +252,25 @@ export function sanitizeEquipmentRecord(input: unknown): {
     ring?: EquipmentItemData
   } = {}
 
-  if (raw.weapon !== undefined) {
+  if (raw.weapon != null) {
     const parsed = normalizeEquipmentItemData(raw.weapon)
     if (!parsed || parsed.slot !== 'weapon') return null
     result.weapon = parsed
   }
 
-  if (raw.armor !== undefined) {
+  if (raw.armor != null) {
     const parsed = normalizeEquipmentItemData(raw.armor)
     if (!parsed || parsed.slot !== 'armor') return null
     result.armor = parsed
   }
 
-  if (raw.helm !== undefined) {
+  if (raw.helm != null) {
     const parsed = normalizeEquipmentItemData(raw.helm)
     if (!parsed || parsed.slot !== 'helm') return null
     result.helm = parsed
   }
 
-  if (raw.ring !== undefined) {
+  if (raw.ring != null) {
     const parsed = normalizeEquipmentItemData(raw.ring)
     if (!parsed || parsed.slot !== 'ring') return null
     result.ring = parsed

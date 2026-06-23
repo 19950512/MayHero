@@ -80,7 +80,7 @@ export const api = {
       gold: number; totalKills: number; skillPoints: number; currentZone: number
       statsJson: Record<string, unknown>; baseStatsJson: Record<string, unknown>; equipJson: Record<string, unknown>
     }>('GET', '/hero'),
-    inventory: () => req<Array<{ id: string; itemData: Record<string, unknown> }>>('GET', '/hero/inventory'),
+    inventory: () => req<Array<{ id: string; itemData: Record<string, unknown>; listing?: { soldAt: string | null } | null }>>('GET', '/hero/inventory'),
     create: (data: { name: string; class: string; stats: unknown; baseStats: unknown }) =>
       req<Record<string, unknown>>('POST', '/hero', data),
     sync: (data: Record<string, unknown>) => req<{ ok: boolean }>('PATCH', '/hero/sync', data),
@@ -104,6 +104,7 @@ export const api = {
           leveledUp: boolean
           itemDrop?: {
             id: string
+            inventoryItemId?: string
             name: string
             slot: 'weapon' | 'armor' | 'helm' | 'ring'
             rarity: 'common' | 'rare' | 'epic' | 'legendary'
@@ -117,7 +118,7 @@ export const api = {
           killsInZone: number
         }
       }>('POST', '/hero/battle/victory', data),
-    npcSell: (data: { npcId: string; itemId: string; quantity: number }) =>
+    npcSell: (data: { npcId: string; inventoryItemIds: string[] }) =>
       req<{ ok: boolean; newGold: number }>('POST', '/hero/npc/sell', data),
     rename: (name: string) => req<{ ok: boolean; name: string }>('PATCH', '/hero/rename', { name }),
     search: (q: string) => req<HeroSearchResult[]>('GET', `/hero/search?q=${encodeURIComponent(q)}`),

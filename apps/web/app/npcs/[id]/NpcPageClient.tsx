@@ -61,8 +61,16 @@ export default function NpcPageClient({ id }: { id: string }) {
       const itemDef = ITEM_BY_ID[confirm.itemId]
       if (itemDef?.stackable === false) {
         try {
-          const result = await api.hero.npcSell({ npcId: npc.id, itemId: confirm.itemId, quantity: confirm.qty })
-          applyNpcEquipmentSell(confirm.itemId, confirm.qty, result.newGold)
+          const itemsToSell = inventory
+            .filter(i => i.id === confirm.itemId && i.inventoryItemId)
+            .slice(0, confirm.qty)
+          if (itemsToSell.length < confirm.qty) {
+            flash('Itens sem rastreamento de ID — recarregue o jogo e tente novamente.', false)
+            return
+          }
+          const inventoryItemIds = itemsToSell.map(i => i.inventoryItemId!)
+          const result = await api.hero.npcSell({ npcId: npc.id, inventoryItemIds })
+          applyNpcEquipmentSell(inventoryItemIds, result.newGold)
           flash('Vendido com sucesso!', true)
         } catch (e) {
           flash(e instanceof Error ? e.message : 'Erro ao vender.', false)
