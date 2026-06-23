@@ -117,6 +117,19 @@ fi
 
 echo ""
 echo "Gerando build estatico do Next para Electron..."
+
+# Load deploy env vars so NEXT_PUBLIC_* variables are baked into the static build.
+DEPLOY_ENV_FILE="$ROOT_DIR/.env.deploy"
+if [[ -f "$DEPLOY_ENV_FILE" ]]; then
+  set -o allexport
+  # shellcheck disable=SC1090
+  source "$DEPLOY_ENV_FILE"
+  set +o allexport
+  echo "Variaveis carregadas de: $DEPLOY_ENV_FILE"
+else
+  echo "Aviso: $DEPLOY_ENV_FILE nao encontrado — usando variaveis de ambiente atuais"
+fi
+
 (
   cd "$WEB_DIR"
   ELECTRON_BUILD=true npm run build

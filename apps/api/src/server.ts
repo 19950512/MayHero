@@ -23,12 +23,20 @@ if (isProd && (!jwtSecret || jwtSecret.length < 32)) {
 const effectiveJwtSecret = jwtSecret ?? 'mayhero-dev-secret-local-only'
 
 // Plugins
+const allowedOrigins = new Set([
+  'http://localhost:3069',
+  'http://localhost:3070',
+  process.env.WEB_URL ?? 'http://localhost:3069',
+])
+
 await app.register(cors, {
-  origin: [
-    'http://localhost:3069',
-    'http://localhost:3070',
-    process.env.WEB_URL ?? 'http://localhost:3069',
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.has(origin)) return callback(null, true)
+    // Electron serves static files from http://127.0.0.1:<random-port>
+    if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return callback(null, true)
+    callback(new Error('Not allowed by CORS'), false)
+  },
   credentials: true,
 })
 
