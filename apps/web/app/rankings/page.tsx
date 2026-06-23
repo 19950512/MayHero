@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { api } from '../lib/api'
 import { CLASS_ICONS } from '../game/data'
-import { useAuthStore } from '../store/authStore'
-import { useGameStore } from '../store/gameStore'
+import { PageHeader } from '../components/PageHeader'
+import { HeroProfileModal } from '../components/HeroProfileModal'
 
 type RankHero = {
   id: string
@@ -37,8 +37,7 @@ export default function RankingsPage() {
   const [tab, setTab] = useState<'level' | 'kills'>('level')
   const [rankings, setRankings] = useState<RankHero[]>([])
   const [loading, setLoading] = useState(true)
-  const { user, logout } = useAuthStore()
-  const { hero } = useGameStore()
+  const [viewingHero, setViewingHero] = useState<string | null>(null)
 
   useEffect(() => {
     const fetcher = tab === 'level' ? api.rankings.byLevel : api.rankings.byKills
@@ -52,38 +51,10 @@ export default function RankingsPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
-      {/* Header */}
-      <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
-          <div className="flex gap-4 text-sm items-center">
-            {user && hero && (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-amber-100/60">Nível</span>
-                  <span className="text-amber-200 font-bold">{hero.level}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-amber-100/60">XP</span>
-                  <span className="text-blue-300 font-semibold">{hero.xp}/{hero.xpToNext}</span>
-                </div>
-              </div>
-            )}
-            <Link href="/loja" className="text-amber-100/55 hover:text-amber-100">Loja</Link>
-            <Link href="/forja" className="text-amber-100/55 hover:text-amber-100">Forja</Link>
-            <Link href="/shop" className="text-amber-100/55 hover:text-amber-100">Mercado</Link>
-            {user ? (
-              <>
-                <Link href="/" className="text-amber-100/55 hover:text-amber-100">Jogar</Link>
-                <span className="text-amber-100/35">@{user.username}</span>
-                <button onClick={logout} className="text-amber-100/35 hover:text-amber-100/70">Sair</button>
-              </>
-            ) : (
-              <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
-            )}
-          </div>
-        </div>
-      </header>
+      {viewingHero && (
+        <HeroProfileModal heroName={viewingHero} onClose={() => setViewingHero(null)} />
+      )}
+      <PageHeader />
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
@@ -120,10 +91,11 @@ export default function RankingsPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {rankings.map((hero, i) => (
-              <div
+              <button
                 key={hero.id}
+                onClick={() => setViewingHero(hero.name)}
                 className={`
-                  flex items-center gap-4 p-4 rounded-xl border transition-colors
+                  w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-colors hover:brightness-110 active:scale-[0.99]
                   ${i === 0 ? 'bg-amber-900/25 border-amber-500/40' :
                     i === 1 ? 'bg-stone-700/35 border-stone-400/30' :
                     i === 2 ? 'bg-orange-900/20 border-orange-700/30' :
@@ -156,7 +128,7 @@ export default function RankingsPage() {
                     {tab === 'level' ? `${hero.totalKills} abates` : `${hero.totalKills} abates`}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

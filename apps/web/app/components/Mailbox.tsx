@@ -7,6 +7,7 @@ import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { RARITY_COLORS } from '../game/data'
 import { ComposeMailModal } from './ComposeMailModal'
+import { HeroProfileModal } from './HeroProfileModal'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -28,6 +29,8 @@ export function Mailbox() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
+  const [composePreRecipient, setComposePreRecipient] = useState<{ name: string; class: string; level: number } | undefined>(undefined)
+  const [viewingHero, setViewingHero] = useState<string | null>(null)
 
   const loadMails = useCallback(async () => {
     if (!user) return
@@ -106,8 +109,20 @@ export function Mailbox() {
     <div className="flex flex-col gap-3 h-full overflow-y-auto">
       {composeOpen && (
         <ComposeMailModal
-          onClose={() => setComposeOpen(false)}
-          onSent={() => { setComposeOpen(false); loadMails() }}
+          preRecipient={composePreRecipient}
+          onClose={() => { setComposeOpen(false); setComposePreRecipient(undefined) }}
+          onSent={() => { setComposeOpen(false); setComposePreRecipient(undefined); loadMails() }}
+        />
+      )}
+      {viewingHero && (
+        <HeroProfileModal
+          heroName={viewingHero}
+          onClose={() => setViewingHero(null)}
+          onSendMail={(name, heroClass, level) => {
+            setViewingHero(null)
+            setComposePreRecipient({ name, class: heroClass, level })
+            setComposeOpen(true)
+          }}
         />
       )}
 
@@ -175,7 +190,15 @@ export function Mailbox() {
                     )}
                   </div>
                   <p className="text-white/30 text-[10px]">
-                    De: {mail.fromHero?.name ?? 'Sistema'} · {timeAgo(mail.createdAt)}
+                    {mail.fromHero ? (
+                      <button
+                        className="text-amber-300/60 hover:text-amber-300 underline underline-offset-2 transition-colors"
+                        onClick={e => { e.stopPropagation(); setViewingHero(mail.fromHero!.name) }}
+                      >
+                        {mail.fromHero.name}
+                      </button>
+                    ) : 'Sistema'}
+                    {' '}· {timeAgo(mail.createdAt)}
                   </p>
                 </div>
                 <span className="text-white/30 text-xs shrink-0">{isExpanded ? '▲' : '▼'}</span>

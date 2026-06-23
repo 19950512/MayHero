@@ -450,6 +450,31 @@ export async function heroRoutes(app: FastifyInstance) {
     }
   })
 
+  // GET /hero/public/:name — public profile, no auth required
+  app.get('/hero/public/:name', async (req, reply) => {
+    const { name } = req.params as { name: string }
+    const hero = await prisma.hero.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } },
+      select: {
+        name: true,
+        class: true,
+        level: true,
+        xp: true,
+        xpToNext: true,
+        gold: true,
+        totalKills: true,
+        currentZone: true,
+        skillPoints: true,
+        statsJson: true,
+        equipJson: true,
+        user: { select: { username: true } },
+      },
+    })
+    if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
+    const { user, ...heroData } = hero
+    return { ...heroData, username: user?.username ?? null }
+  })
+
   // Rename hero
   app.patch('/hero/rename', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub } = req.user as { sub: string }

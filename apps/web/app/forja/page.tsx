@@ -3,8 +3,8 @@
 import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useAuthStore } from '../store/authStore'
 import { useGameStore } from '../store/gameStore'
+import { PageHeader } from '../components/PageHeader'
 import {
   CORE_INFO,
   NPC_STORE,
@@ -63,7 +63,6 @@ function ForjaPageFallback() {
 }
 
 function ForjaPageContent() {
-  const { user, logout } = useAuthStore()
   const { hero, inventory, stackableInventory, enhanceInventoryItem } = useGameStore()
 
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
@@ -144,31 +143,7 @@ function ForjaPageContent() {
 
   return (
     <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
-      <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
-          <div className="flex gap-4 text-sm items-center">
-            {hero && (
-              <div className="flex items-center gap-1">
-                <span className="text-amber-100/60">Ouro</span>
-                <span className="text-amber-300 font-bold">{hero.gold.toLocaleString()}</span>
-              </div>
-            )}
-            <Link href="/loja" className="text-amber-100/55 hover:text-amber-100">Loja</Link>
-            <Link href="/shop" className="text-amber-100/55 hover:text-amber-100">Mercado</Link>
-            <Link href="/rankings" className="text-amber-100/55 hover:text-amber-100">Rankings</Link>
-            {user ? (
-              <>
-                <Link href="/" className="text-amber-100/55 hover:text-amber-100">Jogar</Link>
-                <span className="text-amber-100/35">@{user.username}</span>
-                <button onClick={logout} className="text-amber-100/35 hover:text-amber-100/70">Sair</button>
-              </>
-            ) : (
-              <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
-            )}
-          </div>
-        </div>
-      </header>
+      <PageHeader />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="text-center mb-8">

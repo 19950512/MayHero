@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { api } from '../lib/api'
 import { RARITY_COLORS } from '../game/data'
 import { useAuthStore } from '../store/authStore'
 import { useGameStore } from '../store/gameStore'
 import type { Equipment } from '../game/types'
+import { PageHeader } from '../components/PageHeader'
 
 type Listing = {
   id: string
@@ -35,8 +35,8 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
-  const { user, logout } = useAuthStore()
-  const { addInventoryItem, hero } = useGameStore()
+  const { user } = useAuthStore()
+  const { addInventoryItem } = useGameStore()
 
   const toEquipment = (value: unknown): Equipment | null => {
     if (!value || typeof value !== 'object') return null
@@ -107,31 +107,7 @@ export default function ShopPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
-      <header className="border-b border-amber-900/40 bg-[#1a140f]/90 sticky top-0 backdrop-blur z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-amber-100 font-semibold text-xl tracking-[0.08em]">May Hero</Link>
-          <div className="flex gap-4 text-sm items-center">
-            {user && hero && (
-              <div className="flex items-center gap-1">
-                <span className="text-amber-100/60">Ouro</span>
-                <span className="text-amber-300 font-bold">{hero.gold}</span>
-              </div>
-            )}
-            <Link href="/loja" className="text-amber-100/55 hover:text-amber-100">Loja</Link>
-            <Link href="/forja" className="text-amber-100/55 hover:text-amber-100">Forja</Link>
-            <Link href="/rankings" className="text-amber-100/55 hover:text-amber-100">Rankings</Link>
-            {user ? (
-              <>
-                <Link href="/" className="text-amber-100/55 hover:text-amber-100">Jogar</Link>
-                <span className="text-amber-100/35">@{user.username}</span>
-                <button onClick={logout} className="text-amber-100/35 hover:text-amber-100/70">Sair</button>
-              </>
-            ) : (
-              <Link href="/login" className="text-amber-300 hover:text-amber-200">Entrar</Link>
-            )}
-          </div>
-        </div>
-      </header>
+      <PageHeader />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="text-center mb-8">

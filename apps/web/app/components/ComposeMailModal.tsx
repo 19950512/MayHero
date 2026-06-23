@@ -6,17 +6,19 @@ import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
 import { RARITY_COLORS } from '../game/data'
 import { getItemDisplayName } from '../game/enhancement'
+import { HeroProfileModal } from './HeroProfileModal'
 import type { Equipment } from '../game/types'
 
 const TRANSFER_COST_PER_SEND = 500
 
 interface Props {
   preAttached?: Equipment
+  preRecipient?: { name: string; class: string; level: number }
   onClose: () => void
   onSent: () => void
 }
 
-export function ComposeMailModal({ preAttached, onClose, onSent }: Props) {
+export function ComposeMailModal({ preAttached, preRecipient, onClose, onSent }: Props) {
   const { hero, inventory, replaceInventory } = useGameStore()
   const { user } = useAuthStore()
 
@@ -24,7 +26,9 @@ export function ComposeMailModal({ preAttached, onClose, onSent }: Props) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<HeroSearchResult[]>([])
-  const [recipient, setRecipient] = useState<HeroSearchResult | null>(null)
+  const [recipient, setRecipient] = useState<HeroSearchResult | null>(
+    preRecipient ? { id: preRecipient.name, name: preRecipient.name, class: preRecipient.class, level: preRecipient.level } : null
+  )
 
   // Compose fields
   const [subject, setSubject] = useState(preAttached ? `Transferindo: ${getItemDisplayName(preAttached)}` : '')
@@ -47,6 +51,7 @@ export function ComposeMailModal({ preAttached, onClose, onSent }: Props) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [previewHero, setPreviewHero] = useState<HeroSearchResult | null>(null)
 
   // Fetch DB inventory item IDs so we can attach them
   useEffect(() => {
@@ -174,10 +179,22 @@ export function ComposeMailModal({ preAttached, onClose, onSent }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3" onClick={onClose}>
       <div
-        className="bg-[#1a140f] border border-amber-900/40 rounded-2xl w-full max-w-md flex flex-col gap-3 max-h-[92dvh] overflow-y-auto"
+        className="bg-[#1a140f] border border-amber-900/40 rounded-2xl w-full max-w-md flex flex-col gap-3 max-h-[92dvh] overflow-y-auto relative"
         style={{ padding: '1.25rem' }}
         onClick={e => e.stopPropagation()}
       >
+        {previewHero && (
+          <HeroProfileModal
+            heroName={previewHero.name}
+            onClose={() => setPreviewHero(null)}
+            onSendMail={(name, heroClass, level) => {
+              setPreviewHero(null)
+              setRecipient({ id: previewHero.id, name, class: heroClass, level })
+              setSearchResults([])
+            }}
+          />
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between shrink-0">
           <h2 className="text-amber-100 font-bold text-sm tracking-wide">✉️ Nova Mensagem</h2>
@@ -218,14 +235,22 @@ export function ComposeMailModal({ preAttached, onClose, onSent }: Props) {
           {searchResults.length > 0 && !recipient && (
             <div className="mt-1.5 flex flex-col gap-1 max-h-32 overflow-y-auto">
               {searchResults.map(h => (
-                <button
-                  key={h.id}
-                  onClick={() => { setRecipient(h); setSearchResults([]) }}
-                  className="text-left px-3 py-2 rounded-xl bg-black/30 border border-white/10 hover:border-amber-500/40 text-xs text-white/80 transition-colors"
-                >
-                  <span className="text-amber-200 font-bold">{h.name}</span>
-                  <span className="text-white/35 ml-2 capitalize">{h.class} · Nível {h.level}</span>
-                </button>
+                <div key={h.id} className="flex gap-1">
+                  <button
+                    onClick={() => { setRecipient(h); setSearchResults([]) }}
+                    className="flex-1 text-left px-3 py-2 rounded-xl bg-black/30 border border-white/10 hover:border-amber-500/40 text-xs text-white/80 transition-colors"
+                  >
+                    <span className="text-amber-200 font-bold">{h.name}</span>
+                    <span className="text-white/35 ml-2 capitalize">{h.class} · Nível {h.level}</span>
+                  </button>
+                  <button
+                    onClick={() => setPreviewHero(h)}
+                    className="shrink-0 w-8 rounded-xl bg-black/30 border border-white/10 hover:border-amber-500/40 text-white/40 hover:text-amber-300 text-xs transition-colors"
+                    title="Ver perfil"
+                  >
+                    👤
+                  </button>
+                </div>
               ))}
             </div>
           )}

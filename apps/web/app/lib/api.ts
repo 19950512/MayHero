@@ -119,6 +119,12 @@ export const api = {
       }>('POST', '/hero/battle/victory', data),
     rename: (name: string) => req<{ ok: boolean; name: string }>('PATCH', '/hero/rename', { name }),
     search: (q: string) => req<HeroSearchResult[]>('GET', `/hero/search?q=${encodeURIComponent(q)}`),
+    publicProfile: (name: string) => req<{
+      name: string; class: string; level: number; xp: number; xpToNext: number
+      gold: number; totalKills: number; skillPoints: number; currentZone: number
+      statsJson: Record<string, unknown>; equipJson: Record<string, unknown>
+      username: string | null
+    }>('GET', `/hero/public/${encodeURIComponent(name)}`),
   },
 
   rankings: {

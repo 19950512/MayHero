@@ -360,7 +360,7 @@ export function GameUI() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id === 'menu' && isMenuActive ? activeTab : tab.id)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors relative ${
                 isActive ? 'text-amber-100' : 'text-amber-100/40 hover:text-amber-100/70'
               }`}
