@@ -164,18 +164,8 @@ export async function heroRoutes(app: FastifyInstance) {
     const hero = await prisma.hero.findUnique({ where: { userId: sub } })
     if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
 
-    // Progressão sensível é majoritariamente autoritativa no servidor.
-    if (
-      body.data.level !== hero.level ||
-      body.data.xp !== hero.xp ||
-      body.data.xpToNext !== hero.xpToNext ||
-      body.data.gold !== hero.gold ||
-      body.data.totalKills !== hero.totalKills ||
-      body.data.class !== hero.class
-    ) {
-      return reply.status(400).send({ error: 'Campos de progressão são autoritativos no servidor.' })
-    }
-
+    // Class is the only client-sent field that would actually be written back;
+    // level/xp/gold/totalKills are always overwritten with DB values so no need to validate them.
     if (body.data.class !== hero.class) {
       return reply.status(400).send({ error: 'Classe não pode ser alterada via sync.' })
     }
