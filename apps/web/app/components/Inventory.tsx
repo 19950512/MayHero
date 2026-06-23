@@ -3,25 +3,17 @@
 import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
-import { RARITY_COLORS, ITEM_BY_ID, DUNGEON_BY_ID } from '../game/data'
+import { ITEM_BY_ID, DUNGEON_BY_ID } from '../game/data'
 import { api } from '../lib/api'
 import { getItemDisplayName } from '../game/enhancement'
 import { ItemDetailModal } from './ItemDetailModal'
 import type { Equipment } from '../game/types'
 
-const SLOT_LABELS: Record<Equipment['slot'], string> = {
-  weapon: 'Arma',
-  armor: 'Armadura',
-  helm: 'Elmo',
-  ring: 'Anel',
-}
-
-interface ListingForm {
-  itemKey: string
-  price: string
-  loading: boolean
-  error: string | null
-  success: boolean
+const RARITY_BORDER: Record<Equipment['rarity'], string> = {
+  common:    'border-stone-500/50',
+  rare:      'border-blue-500/60',
+  epic:      'border-purple-500/60',
+  legendary: 'border-amber-500/70',
 }
 
 interface Props {
@@ -32,30 +24,27 @@ export function Inventory({ onComposeMail }: Props) {
   const { inventory, hero, equipItemFromInventory, replaceInventory, currentDungeon, stackableInventory } = useGameStore()
   const currentZoneId = DUNGEON_BY_ID[currentDungeon]?.zoneId ?? 1
   const { user } = useAuthStore()
-  const [form, setForm] = useState<ListingForm | null>(null)
-  const [search, setSearch] = useState('')
   const [detailItem, setDetailItem] = useState<Equipment | null>(null)
-  const [openActionKey, setOpenActionKey] = useState<string | null>(null)
+  const [sellItem, setSellItem] = useState<Equipment | null>(null)
+  const [sellPrice, setSellPrice] = useState('')
+  const [sellLoading, setSellLoading] = useState(false)
+  const [sellError, setSellError] = useState<string | null>(null)
 
   if (!hero) return null
 
-  const toggleActions = (key: string) =>
-    setOpenActionKey(prev => (prev === key ? null : key))
-
-  const handleStartList = (itemKey: string) => {
-    setForm({ itemKey, price: '', loading: false, error: null, success: false })
+  const openDetail = (item: Equipment) => {
+    setDetailItem(item)
+    setSellItem(null)
+    setSellError(null)
+    setSellPrice('')
   }
 
-  const handleCancelList = () => setForm(null)
-
-  const handleSubmitList = async (item: Equipment) => {
-    if (!form || !hero || !user) return
-    const price = parseInt(form.price, 10)
-    if (isNaN(price) || price < 1) {
-      setForm(f => f ? { ...f, error: 'Preço deve ser ≥ 1.' } : null)
-      return
-    }
-    setForm(f => f ? { ...f, loading: true, error: null } : null)
+  const handleSell = async (item: Equipment) => {
+    if (!hero || !user) return
+    const price = parseInt(sellPrice, 10)
+    if (isNaN(price) || price < 1) { setSellError('Preço deve ser ≥ 1.'); return }
+    setSellLoading(true)
+    setSellError(null)
     try {
       const syncData = {
         name: hero.name, class: hero.class,
@@ -73,38 +62,29 @@ export function Inventory({ onComposeMail }: Props) {
           await api.hero.sync(syncData as Record<string, unknown>)
         } else throw e
       }
-
       const dbItems = await api.hero.inventory()
-      const dbItem = dbItems.find(di =>
-        di.itemData.id === item.id &&
-        di.itemData.slot === item.slot &&
-        di.itemData.rarity === item.rarity
-      )
-      if (!dbItem) throw new Error('Item não encontrado no servidor. Sincronize e tente novamente.')
-
+      const dbItem = dbItems.find(di => di.itemData.id === item.id && di.itemData.slot === item.slot && di.itemData.rarity === item.rarity)
+      if (!dbItem) throw new Error('Item não encontrado no servidor.')
       await api.shop.listItem(dbItem.id, price)
-      setForm(f => f ? { ...f, loading: false, success: true } : null)
-      setTimeout(() => { setForm(null); setOpenActionKey(null) }, 2000)
+      setSellItem(null)
+      setDetailItem(null)
     } catch (e) {
-      setForm(f => f ? { ...f, loading: false, error: e instanceof Error ? e.message : 'Erro ao listar.' } : null)
+      setSellError(e instanceof Error ? e.message : 'Erro ao listar.')
+    } finally {
+      setSellLoading(false)
     }
   }
 
-  const handleSendItem = async (item: Equipment) => {
+  const handleSend = async (item: Equipment) => {
+    setDetailItem(null)
     if (onComposeMail) {
       onComposeMail(item)
     } else {
-      // Fallback: refresh inventory from server after send completes
       api.hero.inventory()
         .then(dbItems => {
           const items = dbItems.map(db => {
             const raw = db.itemData
-            if (
-              typeof raw.id !== 'string' || typeof raw.name !== 'string' ||
-              typeof raw.slot !== 'string' || typeof raw.rarity !== 'string' ||
-              typeof raw.icon !== 'string' || typeof raw.requiredLevel !== 'number' ||
-              !raw.bonuses || typeof raw.bonuses !== 'object'
-            ) return null
+            if (typeof raw.id !== 'string' || typeof raw.name !== 'string' || typeof raw.slot !== 'string' || typeof raw.rarity !== 'string' || typeof raw.icon !== 'string' || typeof raw.requiredLevel !== 'number' || !raw.bonuses || typeof raw.bonuses !== 'object') return null
             if (!['weapon', 'armor', 'helm', 'ring'].includes(raw.slot as string)) return null
             return raw as unknown as Equipment
           }).filter((i): i is Equipment => !!i)
@@ -114,50 +94,62 @@ export function Inventory({ onComposeMail }: Props) {
     }
   }
 
-  const filteredInventory = search.trim()
-    ? inventory.filter(item =>
-        getItemDisplayName(item).toLowerCase().includes(search.toLowerCase()) ||
-        SLOT_LABELS[item.slot].toLowerCase().includes(search.toLowerCase())
-      )
-    : inventory
-
   return (
-    <div className="flex flex-col gap-2 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 h-full overflow-y-auto">
       {detailItem && (
         <ItemDetailModal
           item={detailItem}
-          onClose={() => setDetailItem(null)}
-          onEquip={() => equipItemFromInventory(detailItem)}
+          onClose={() => { setDetailItem(null); setSellItem(null); setSellError(null); setSellPrice('') }}
+          onEquip={() => { equipItemFromInventory(detailItem); setDetailItem(null) }}
           canEquip={hero.level >= detailItem.requiredLevel}
+          onSell={user ? () => setSellItem(detailItem) : undefined}
+          onSend={user ? () => handleSend(detailItem) : undefined}
+          sellPanel={sellItem?.id === detailItem.id ? (
+            <div className="flex flex-col gap-2">
+              {sellError && <p className="text-red-400 text-xs">{sellError}</p>}
+              <div className="flex gap-2 items-center">
+                <span className="text-yellow-400 text-xs shrink-0">🪙 Preço</span>
+                <input
+                  type="number" min={1} placeholder="Ouro"
+                  value={sellPrice}
+                  onChange={e => { setSellPrice(e.target.value); setSellError(null) }}
+                  className="flex-1 bg-black/40 border border-white/10 rounded-md px-2 py-1 text-xs text-white placeholder-white/20 outline-none focus:border-yellow-500/50"
+                />
+                <button
+                  onClick={() => handleSell(detailItem)}
+                  disabled={sellLoading}
+                  className="px-3 py-1 rounded-md text-xs font-bold bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white transition-colors"
+                >
+                  {sellLoading ? '...' : 'Listar'}
+                </button>
+                <button onClick={() => { setSellItem(null); setSellError(null) }} className="text-white/40 hover:text-white/70 text-sm">✕</button>
+              </div>
+            </div>
+          ) : undefined}
         />
       )}
 
       <p className="text-white/40 text-xs uppercase font-bold">Inventário ({inventory.length})</p>
 
-      {inventory.length > 0 && (
-        <input
-          type="text"
-          placeholder="Buscar item..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25"
-        />
-      )}
-
       {/* Stackable items */}
       {Object.entries(stackableInventory).some(([, qty]) => qty > 0) && (
         <div className="bg-slate-900/40 rounded-lg border border-white/10 p-2.5">
           <p className="text-white/45 text-xs uppercase font-bold mb-2">Consumíveis e Recursos</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(stackableInventory)
               .filter(([, qty]) => qty > 0)
               .map(([itemId, qty]) => {
                 const def = ITEM_BY_ID[itemId]
                 return (
-                  <div key={itemId} className="px-2 py-1 rounded-md border border-white/10 bg-black/30 text-xs text-white/80 flex items-center gap-1.5">
-                    <span>{def?.icon ?? '•'}</span>
-                    <span>{def?.name ?? itemId}</span>
-                    <span className="text-amber-300 font-bold">x{qty}</span>
+                  <div key={itemId} className="flex flex-col items-center gap-0.5 w-14">
+                    <div className="w-12 h-12 rounded-md border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden">
+                      {def?.sprite
+                        ? <img src={def.sprite} alt={def.name} className="w-full h-full object-contain p-1" />
+                        : <span className="text-xl">{def?.icon ?? '•'}</span>
+                      }
+                    </div>
+                    <span className="text-amber-300 text-[10px] font-bold">x{qty}</span>
+                    <span className="text-white/40 text-[9px] text-center leading-tight truncate w-full text-center">{def?.name ?? itemId}</span>
                   </div>
                 )
               })}
@@ -165,154 +157,45 @@ export function Inventory({ onComposeMail }: Props) {
         </div>
       )}
 
-      {/* Equipment list */}
-      <div className="flex flex-col gap-1.5">
-        {inventory.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <p className="text-white/20 text-sm text-center">Nenhum item ainda.<br />Derrote inimigos para obter drops!</p>
-          </div>
-        ) : filteredInventory.length === 0 ? (
-          <p className="text-white/25 text-xs text-center py-4">Nenhum item encontrado para &quot;{search}&quot;</p>
-        ) : (
-          filteredInventory.map((item) => {
-            const realIdx = inventory.indexOf(item)
-            const itemKey = `${item.id}-${realIdx}`
-            const canEquip = hero.level >= item.requiredLevel
+      {/* Equipment grid */}
+      {inventory.length === 0 ? (
+        <div className="flex items-center justify-center py-10">
+          <p className="text-white/20 text-sm text-center">Nenhum item ainda.<br />Derrote inimigos para obter drops!</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-5 gap-1.5">
+          {inventory.map((item, i) => {
+            const sprite = ITEM_BY_ID[item.id]?.sprite
             const enhancement = item.enhancement ?? 0
-            const bonusText = Object.entries(item.bonuses)
-              .map(([k, v]) => `+${v} ${k.toUpperCase()}`)
-              .join(', ')
-            const isActionsOpen = openActionKey === itemKey
-            const isListingThis = form?.itemKey === itemKey
-
+            const canEquip = hero.level >= item.requiredLevel
             return (
-              <div
-                key={itemKey}
-                className={`rounded-lg border overflow-hidden transition-colors ${
-                  isActionsOpen ? 'bg-slate-800/80 border-amber-900/30' : 'bg-slate-800/60 border-white/5'
-                }`}
+              <button
+                key={`${item.id}-${i}`}
+                onClick={() => openDetail(item)}
+                title={getItemDisplayName(item)}
+                className={`relative aspect-square rounded-lg border-2 bg-black/40 hover:bg-black/70 transition-all overflow-hidden group ${RARITY_BORDER[item.rarity]} ${!canEquip ? 'opacity-60' : ''}`}
               >
-                {/* Main row */}
-                <div className="p-2.5 flex items-center gap-3">
-                  <button
-                    onClick={() => setDetailItem(item)}
-                    className="text-xl w-8 text-center shrink-0 hover:scale-125 transition-transform"
-                    title="Ver detalhes"
-                  >
+                {sprite ? (
+                  <img
+                    src={sprite}
+                    alt={item.name}
+                    className="w-full h-full object-contain p-1 group-hover:scale-110 transition-transform duration-150"
+                  />
+                ) : (
+                  <span className="flex items-center justify-center h-full text-2xl group-hover:scale-110 transition-transform duration-150">
                     {item.icon}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className={`text-xs font-bold ${RARITY_COLORS[item.rarity]}`}>{getItemDisplayName(item)}</p>
-                      {enhancement > 0 && (
-                        <span className={`text-xs font-bold px-1 rounded ${enhancement >= 15 ? 'text-red-400 bg-red-900/20' : enhancement >= 8 ? 'text-amber-400 bg-amber-900/20' : 'text-green-400 bg-green-900/20'}`}>
-                          +{enhancement}
-                        </span>
-                      )}
-                      <span className="text-white/20 text-xs">·</span>
-                      <span className="text-white/30 text-xs">{SLOT_LABELS[item.slot]}</span>
-                    </div>
-                    <p className="text-white/40 text-xs truncate">{bonusText}</p>
-                    {item.requiredLevel > 1 && (
-                      <p className={`text-xs ${canEquip ? 'text-white/20' : 'text-red-400/60'}`}>
-                        Nível {item.requiredLevel}+
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Single action toggle */}
-                  <button
-                    onClick={() => { toggleActions(itemKey); if (form?.itemKey === itemKey) setForm(null) }}
-                    className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
-                      isActionsOpen
-                        ? 'bg-amber-800/60 text-amber-100'
-                        : 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80'
-                    }`}
-                    title="Ações"
-                  >
-                    {isActionsOpen ? '✕' : '⋯'}
-                  </button>
-                </div>
-
-                {/* Expanded actions */}
-                {isActionsOpen && (
-                  <div className="px-2.5 pb-2.5 border-t border-white/5 pt-2 flex flex-col gap-2">
-                    <div className="flex gap-1.5 flex-wrap">
-                      <button
-                        onClick={() => { equipItemFromInventory(item); setOpenActionKey(null) }}
-                        disabled={!canEquip}
-                        className="px-3 py-1.5 rounded-md text-xs font-bold bg-indigo-700 hover:bg-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
-                      >
-                        ⚔️ Equipar
-                      </button>
-                      <button
-                        onClick={() => setDetailItem(item)}
-                        className="px-3 py-1.5 rounded-md text-xs font-bold bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-                      >
-                        📋 Detalhes
-                      </button>
-                      {user && !isListingThis && (
-                        <button
-                          onClick={() => handleStartList(itemKey)}
-                          className="px-3 py-1.5 rounded-md text-xs font-bold bg-yellow-700/80 hover:bg-yellow-600 text-white transition-colors"
-                        >
-                          🏷️ Vender
-                        </button>
-                      )}
-                      {user && (
-                        <button
-                          onClick={() => { handleSendItem(item); setOpenActionKey(null) }}
-                          className="px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-800/80 hover:bg-emerald-700 text-white transition-colors"
-                        >
-                          ✉️ Enviar
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Inline listing form */}
-                    {isListingThis && (
-                      <div className="border-t border-white/5 pt-2">
-                        {form?.success ? (
-                          <p className="text-green-400 text-xs text-center font-bold">✓ Listado no mercado!</p>
-                        ) : (
-                          <>
-                            {form?.error && <p className="text-red-400 text-xs mb-1.5">{form.error}</p>}
-                            <div className="flex gap-2 items-center">
-                              <span className="text-yellow-400 text-xs shrink-0">Ouro</span>
-                              <input
-                                type="number"
-                                min={1}
-                                placeholder="Preço"
-                                value={form?.price ?? ''}
-                                onChange={e => setForm(f => f ? { ...f, price: e.target.value, error: null } : null)}
-                                className="flex-1 bg-black/40 border border-white/10 rounded-md px-2 py-1 text-xs text-white placeholder-white/20 outline-none focus:border-yellow-500/50"
-                              />
-                              <button
-                                onClick={() => handleSubmitList(item)}
-                                disabled={form?.loading}
-                                className="px-3 py-1 rounded-md text-xs font-bold bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white transition-colors"
-                              >
-                                {form?.loading ? '...' : 'Listar'}
-                              </button>
-                              <button
-                                onClick={handleCancelList}
-                                className="px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  </span>
                 )}
-              </div>
+                {enhancement > 0 && (
+                  <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold text-amber-300 bg-black/80 rounded px-0.5 leading-tight">
+                    +{enhancement}
+                  </span>
+                )}
+              </button>
             )
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -19,6 +19,9 @@ import {
 import type { SkillAllocStat } from '../game/types'
 import { attemptEnhancement, NPC_STORE } from '../game/enhancement'
 import type { EnhancementResult } from '../game/enhancement'
+import { NPC_BY_ID } from '../game/npcs'
+import { ITEM_BY_ID } from '../game/items'
+import type { EquipmentItemDefinition } from '../game/types'
 
 interface Notification {
   id: string
@@ -48,6 +51,7 @@ interface GameState {
   currentDungeon: string
   inventory: Equipment[]
   stackableInventory: Record<string, number>
+  npcPurchased: Record<string, Record<string, number>>
   notifications: Notification[]
   autoFight: boolean
   serverAuthoritativeRewards: boolean
@@ -74,6 +78,8 @@ interface GameState {
   setServerAuthoritativeRewards: (enabled: boolean) => void
   enhanceInventoryItem: (item: Equipment, coreId: string) => EnhancementResult | null
   buyFromNpcStore: (itemId: string, quantity: number) => { ok: boolean; error?: string }
+  buyFromNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
+  sellToNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
   startServerEncounter: (payload: { encounterId: string; enemyId: string }) => void
   applyServerVictoryResolution: (payload: {
     hero: {
@@ -121,6 +127,7 @@ export const useGameStore = create<GameState>()(
       currentDungeon: 'floresta_santa_rita',
       inventory: [],
       stackableInventory: {},
+      npcPurchased: {},
       notifications: [],
       autoFight: true,
       serverAuthoritativeRewards: false,
@@ -452,6 +459,69 @@ export const useGameStore = create<GameState>()(
         return { ok: true }
       },
 
+      buyFromNpc: (npcId, itemId, quantity) => {
+        const { hero, stackableInventory, inventory, npcPurchased } = get()
+        if (!hero) return { ok: false, error: 'Sem herói ativo.' }
+
+        const npc = NPC_BY_ID[npcId]
+        if (!npc) return { ok: false, error: 'NPC não encontrado.' }
+
+        const entry = npc.sells.find(e => e.itemId === itemId)
+        if (!entry) return { ok: false, error: 'Item não disponível.' }
+
+        const alreadyBought = npcPurchased[npcId]?.[itemId] ?? 0
+        const remaining = entry.quantity - alreadyBought
+        if (quantity > remaining) return { ok: false, error: `Estoque insuficiente. Disponível: ${remaining}` }
+
+        const totalCost = entry.price * quantity
+        if (hero.gold < totalCost) return { ok: false, error: 'Ouro insuficiente.' }
+
+        const itemDef = ITEM_BY_ID[itemId]
+        if (!itemDef) return { ok: false, error: 'Item não encontrado no catálogo.' }
+
+        const newNpcPurchased = {
+          ...npcPurchased,
+          [npcId]: { ...(npcPurchased[npcId] ?? {}), [itemId]: alreadyBought + quantity },
+        }
+
+        if (itemDef.stackable) {
+          const newStackable = { ...stackableInventory }
+          newStackable[itemId] = (newStackable[itemId] ?? 0) + quantity
+          set({ hero: { ...hero, gold: hero.gold - totalCost }, stackableInventory: newStackable, npcPurchased: newNpcPurchased })
+        } else {
+          const eq = itemDef as EquipmentItemDefinition
+          const newItems: Equipment[] = Array.from({ length: quantity }, () => ({
+            id: eq.id, name: eq.name, slot: eq.slot, rarity: eq.rarity,
+            bonuses: eq.bonuses, icon: eq.icon, requiredLevel: eq.requiredLevel,
+          }))
+          set({ hero: { ...hero, gold: hero.gold - totalCost }, inventory: [...inventory, ...newItems], npcPurchased: newNpcPurchased })
+        }
+        return { ok: true }
+      },
+
+      sellToNpc: (npcId, itemId, quantity) => {
+        const { hero, stackableInventory } = get()
+        if (!hero) return { ok: false, error: 'Sem herói ativo.' }
+
+        const npc = NPC_BY_ID[npcId]
+        if (!npc) return { ok: false, error: 'NPC não encontrado.' }
+
+        const entry = npc.buys.find(e => e.itemId === itemId)
+        if (!entry) return { ok: false, error: 'NPC não compra este item.' }
+
+        const owned = stackableInventory[itemId] ?? 0
+        if (owned < quantity) return { ok: false, error: `Você possui apenas ${owned}.` }
+
+        const totalEarned = entry.price * quantity
+        const newStackable = { ...stackableInventory }
+        const remaining = owned - quantity
+        if (remaining <= 0) delete newStackable[itemId]
+        else newStackable[itemId] = remaining
+
+        set({ hero: { ...hero, gold: hero.gold + totalEarned }, stackableInventory: newStackable })
+        return { ok: true }
+      },
+
       spendSkillPoint: (stat) => {
         const { hero } = get()
         if (!hero) return
@@ -557,6 +627,7 @@ export const useGameStore = create<GameState>()(
           currentDungeon: 'floresta_santa_rita',
           inventory: [],
           stackableInventory: {},
+          npcPurchased: {},
           notifications: [],
           autoFight: true,
           serverAuthoritativeRewards: false,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useGameStore } from '../store/gameStore'
 import { computeStats, getHeroLoadout, normalizeSkillAllocationsForLevel } from '../game/engine'
@@ -20,6 +21,7 @@ const SKILL_OPTIONS: { stat: SkillAllocStat; label: string; icon: string; bonus:
 export function HeroStats() {
   const { hero, heroMessage, setHeroMessage, spendSkillPoint, unequipItem } = useGameStore()
   const [detailItem, setDetailItem] = useState<Equipment | null>(null)
+  const [classSpriteError, setClassSpriteError] = useState(false)
   const router = useRouter()
   if (!hero) return null
 
@@ -115,10 +117,26 @@ export function HeroStats() {
       )}
       <div className="bg-gradient-to-b from-[#23180f] to-[#130f0a] rounded-xl p-3 border border-amber-700/40">
         <div className="flex gap-3">
-          <div className="w-24 h-24 rounded-xl border border-amber-200/25 bg-[radial-gradient(circle_at_30%_20%,#5d3f1e_0%,#1b140f_70%)] flex flex-col items-center justify-center shrink-0">
-            <span className="text-3xl leading-none">{classArt[hero.class]}</span>
-            <span className="text-[10px] text-amber-100/80 tracking-widest font-bold mt-1">{classData.sigil}</span>
-          </div>
+          {classData.sprite && !classSpriteError
+            ? (
+              <div className="w-24 h-24 rounded-xl border border-amber-200/25 bg-[#1b140f] shrink-0 relative overflow-hidden">
+                <Image
+                  src={classData.sprite}
+                  alt={classData.name}
+                  fill
+                  unoptimized
+                  className="object-contain"
+                  onError={() => setClassSpriteError(true)}
+                />
+              </div>
+            )
+            : (
+              <div className="w-24 h-24 rounded-xl border border-amber-200/25 bg-[radial-gradient(circle_at_30%_20%,#5d3f1e_0%,#1b140f_70%)] flex flex-col items-center justify-center shrink-0">
+                <span className="text-3xl leading-none">{classArt[hero.class]}</span>
+                <span className="text-[10px] text-amber-100/80 tracking-widest font-bold mt-1">{classData.sigil}</span>
+              </div>
+            )
+          }
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-amber-100 font-bold text-sm tracking-wide truncate">{hero.name}</h2>

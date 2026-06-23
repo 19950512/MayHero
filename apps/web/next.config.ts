@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@mayhero/shared'],
   // Static export for Electron production build
   // Remove this when running `next dev`
   ...(process.env.ELECTRON_BUILD === 'true' && {

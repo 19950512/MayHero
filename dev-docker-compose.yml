@@ -12,6 +12,8 @@ services:
     # Sem exposição ao host — acesso apenas interno via rede Docker
     expose:
       - "5432"
+    ports:
+      - "5412:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -39,8 +41,8 @@ services:
   # ─── API (Fastify + Prisma) ───────────────────────────────────────────────────
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
     container_name: mayhero-api
     restart: unless-stopped
     ports:
@@ -59,14 +61,14 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./apps/api/src:/app/src:ro
-      - ./apps/api/prisma:/app/prisma:ro
+      - ./apps/api/src:/app/apps/api/src:ro
+      - ./apps/api/prisma:/app/apps/api/prisma:ro
 
   # ─── Web (Next.js) ───────────────────────────────────────────────────────────
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
     container_name: mayhero-web
     restart: unless-stopped
     ports:
@@ -77,8 +79,8 @@ services:
     depends_on:
       - api
     volumes:
-      - ./apps/web/app:/app/app:ro
-      - ./apps/web/public:/app/public:ro
+      - ./apps/web/app:/app/apps/web/app:ro
+      - ./apps/web/public:/app/apps/web/public:ro
 
 volumes:
   postgres_data:

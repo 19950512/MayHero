@@ -1,19 +1,26 @@
 FROM node:20
-
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+# Copy workspace manifest
+COPY package.json ./
 
-# Copy config files
-COPY next.config.ts postcss.config.mjs tsconfig.json ./
-COPY eslint.config.mjs ./
+# Copy shared package source
+COPY packages/shared/ packages/shared/
 
-# Copy public and app source (volumes override in dev)
-COPY public ./public
-COPY app ./app
+# Copy web package files
+COPY apps/web/package.json apps/web/
+COPY apps/web/next.config.ts apps/web/
+COPY apps/web/postcss.config.mjs apps/web/
+COPY apps/web/tsconfig.json apps/web/
+COPY apps/web/eslint.config.mjs apps/web/
 
+# Install workspace deps
+RUN npm install --workspace=@mayhero/shared --workspace=@mayhero/web
+
+# Copy source (overridden by volume in dev)
+COPY apps/web/public/ apps/web/public/
+COPY apps/web/app/ apps/web/app/
+
+WORKDIR /app/apps/web
 EXPOSE 3069
-
 CMD ["npm", "run", "dev"]

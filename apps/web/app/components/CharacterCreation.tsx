@@ -11,7 +11,7 @@ import type { HeroClass } from '../game/types'
 
 export function CharacterCreation() {
   const [name, setName] = useState('')
-  const [selectedClass, setSelectedClass] = useState<HeroClass>('warrior')
+  const [selectedClass, setSelectedClass] = useState<HeroClass>('knight')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { startGame, hydrateHeroFromServer } = useGameStore()

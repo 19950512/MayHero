@@ -1,6 +1,8 @@
 'use client'
 
+import React from 'react'
 import { getItemDisplayName, enhanceBonusPerLevel } from '../game/enhancement'
+import { ITEM_BY_ID } from '../game/data'
 import type { Equipment } from '../game/types'
 
 const RARITY_COLORS: Record<Equipment['rarity'], string> = {
@@ -38,9 +40,12 @@ interface ItemDetailModalProps {
   canEquip?: boolean
   onUnequip?: () => void
   onForge?: () => void
+  onSell?: () => void
+  onSend?: () => void
+  sellPanel?: React.ReactNode
 }
 
-export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, onForge }: ItemDetailModalProps) {
+export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, onForge, onSell, onSend, sellPanel }: ItemDetailModalProps) {
   const enhancement = item.enhancement ?? 0
   const bonusEntries = Object.entries(item.bonuses ?? {})
 
@@ -63,7 +68,10 @@ export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, o
 
         {/* Icon + name */}
         <div className="flex flex-col items-center text-center mb-4">
-          <span className="text-5xl mb-2">{item.icon}</span>
+          {ITEM_BY_ID[item.id]?.sprite
+            ? <img src={ITEM_BY_ID[item.id]!.sprite} alt={item.name} className="w-20 h-20 object-contain mb-2 drop-shadow-lg" />
+            : <span className="text-5xl mb-2">{item.icon}</span>
+          }
           <p className={`font-bold text-base ${RARITY_COLORS[item.rarity]}`}>
             {getItemDisplayName(item)}
           </p>
@@ -153,7 +161,7 @@ export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, o
               onClick={() => { onForge(); onClose() }}
               className="w-full py-2 rounded-xl text-sm font-bold bg-amber-800 hover:bg-amber-700 text-amber-50 transition-colors"
             >
-              ⚒️ Aprimorar na Forja
+              Aprimorar na Forja
             </button>
           )}
           {onUnequip !== undefined && (
@@ -164,6 +172,27 @@ export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, o
               Desequipar
             </button>
           )}
+          {(onSell !== undefined || onSend !== undefined) && (
+            <div className="flex gap-2 pt-1 border-t border-white/5">
+              {onSell !== undefined && (
+                <button
+                  onClick={onSell}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-stone-800 hover:bg-stone-700 text-yellow-400 transition-colors"
+                >
+                  Vender
+                </button>
+              )}
+              {onSend !== undefined && (
+                <button
+                  onClick={onSend}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-stone-800 hover:bg-stone-700 text-sky-400 transition-colors"
+                >
+                  Enviar
+                </button>
+              )}
+            </div>
+          )}
+          {sellPanel && <div className="pt-1 border-t border-white/5">{sellPanel}</div>}
         </div>
       </div>
     </div>

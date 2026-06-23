@@ -1,0 +1,406 @@
+'use client'
+
+import { useState, useMemo, use } from 'react'
+import { notFound } from 'next/navigation'
+import { NPC_BY_ID } from '../../game/npcs'
+import type { NpcSellEntry, NpcBuyEntry } from '../../game/npcs'
+import { ITEM_BY_ID } from '../../game/items'
+import { useGameStore } from '../../store/gameStore'
+import { PageHeader } from '../../components/PageHeader'
+
+const RARITY_COLORS: Record<string, string> = {
+  common:    'text-stone-300',
+  rare:      'text-blue-400',
+  epic:      'text-purple-400',
+  legendary: 'text-amber-400',
+}
+
+const RARITY_BORDER: Record<string, string> = {
+  common:    'border-stone-600/40',
+  rare:      'border-blue-500/40',
+  epic:      'border-purple-500/40',
+  legendary: 'border-amber-500/40',
+}
+
+type ConfirmMode = 'buy' | 'sell'
+
+interface ConfirmState {
+  mode: ConfirmMode
+  itemId: string
+  qty: number
+}
+
+export default function NpcPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
+  const npc = NPC_BY_ID[id]
+  if (!npc) notFound()
+
+  const { hero, stackableInventory, npcPurchased, buyFromNpc, sellToNpc } = useGameStore()
+
+  const [tab, setTab] = useState<'comprar' | 'vender'>('comprar')
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const phrase = useMemo(
+    () => npc.phrases[Math.floor(Math.random() * npc.phrases.length)],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [npc.id]
+  )
+
+  const flash = (text: string, ok: boolean) => {
+    setMsg({ text, ok })
+    setTimeout(() => setMsg(null), 3500)
+  }
+
+  const handleConfirm = () => {
+    if (!confirm) return
+    if (confirm.mode === 'buy') {
+      const result = buyFromNpc(npc.id, confirm.itemId, confirm.qty)
+      flash(result.ok ? `Comprado com sucesso!` : (result.error ?? 'Erro.'), result.ok)
+    } else {
+      const result = sellToNpc(npc.id, confirm.itemId, confirm.qty)
+      flash(result.ok ? `Vendido com sucesso!` : (result.error ?? 'Erro.'), result.ok)
+    }
+    setConfirm(null)
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#3b2818_0%,#1d150f_35%,#100d08_70%,#090806_100%)] text-[var(--ink)]">
+      <PageHeader />
+
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        {/* NPC portrait */}
+        <div className="flex flex-col items-center mb-8">
+          {npc.sprite
+            ? <img src={npc.sprite} alt={npc.name} className="w-36 h-36 object-contain mb-3 rounded-2xl" />
+            : <div className="text-7xl mb-3">{npc.image}</div>
+          }
+          <h1 className="text-2xl font-bold text-amber-100 tracking-wide">{npc.name}</h1>
+          <p className="text-amber-100/45 text-sm mt-1 text-center max-w-xs">{npc.lore}</p>
+          <div className="mt-4 bg-[#18120d] border border-amber-700/30 rounded-xl px-5 py-3 max-w-sm text-center">
+            <span className="text-amber-100/70 text-sm italic">"{phrase}"</span>
+          </div>
+        </div>
+
+        {/* Flash message */}
+        {msg && (
+          <div className={`mb-5 p-3 rounded-xl text-sm text-center ${msg.ok ? 'bg-green-900/30 text-green-300 border border-green-500/30' : 'bg-red-900/30 text-red-300 border border-red-500/30'}`}>
+            {msg.text}
+          </div>
+        )}
+
+        {!hero && (
+          <div className="mb-5 p-3 rounded-xl text-sm text-center bg-amber-900/20 text-amber-300 border border-amber-500/30">
+            Inicie uma partida para negociar.
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-5">
+          <button
+            onClick={() => setTab('comprar')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${tab === 'comprar' ? 'bg-amber-800 text-amber-50' : 'bg-[#18120d] text-amber-100/50 hover:text-amber-100/80 border border-amber-900/30'}`}
+          >
+            🛒 Comprar
+          </button>
+          <button
+            onClick={() => setTab('vender')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${tab === 'vender' ? 'bg-amber-800 text-amber-50' : 'bg-[#18120d] text-amber-100/50 hover:text-amber-100/80 border border-amber-900/30'}`}
+          >
+            💰 Vender
+          </button>
+        </div>
+
+        {/* Buy tab */}
+        {tab === 'comprar' && (
+          <div className="flex flex-col gap-3">
+            {npc.sells.map(entry => (
+              <BuyCard
+                key={entry.itemId}
+                entry={entry}
+                alreadyBought={npcPurchased[npc.id]?.[entry.itemId] ?? 0}
+                heroGold={hero?.gold ?? 0}
+                disabled={!hero}
+                onRequest={(qty) => setConfirm({ mode: 'buy', itemId: entry.itemId, qty })}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Sell tab */}
+        {tab === 'vender' && (
+          <div className="flex flex-col gap-3">
+            {npc.buys.map(entry => (
+              <SellCard
+                key={entry.itemId}
+                entry={entry}
+                owned={stackableInventory[entry.itemId] ?? 0}
+                disabled={!hero}
+                onRequest={(qty) => setConfirm({ mode: 'sell', itemId: entry.itemId, qty })}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Confirmation modal */}
+      {confirm && (
+        <ConfirmModal
+          mode={confirm.mode}
+          itemId={confirm.itemId}
+          qty={confirm.qty}
+          npcId={npc.id}
+          heroGold={hero?.gold ?? 0}
+          stackableInventory={stackableInventory}
+          npcPurchased={npcPurchased}
+          npcSells={npc.sells}
+          npcBuys={npc.buys}
+          onChangeQty={(qty) => setConfirm(c => c ? { ...c, qty } : c)}
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function BuyCard({
+  entry,
+  alreadyBought,
+  heroGold,
+  disabled,
+  onRequest,
+}: {
+  entry: NpcSellEntry
+  alreadyBought: number
+  heroGold: number
+  disabled: boolean
+  onRequest: (qty: number) => void
+}) {
+  const [qty, setQty] = useState(1)
+  const itemDef = ITEM_BY_ID[entry.itemId]
+  const remaining = entry.quantity - alreadyBought
+  const total = entry.price * qty
+  const canAfford = heroGold >= total
+  const hasStock = remaining > 0
+
+  if (!itemDef) return null
+
+  return (
+    <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[itemDef.rarity]} flex gap-3`}>
+      <div className="text-3xl w-10 text-center shrink-0 mt-0.5">{itemDef.icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
+          <span className="text-amber-100/30 text-[10px] capitalize">{itemDef.category}</span>
+        </div>
+        <p className="text-amber-100/35 text-xs mt-0.5">Estoque: {hasStock ? remaining : 'Esgotado'}</p>
+
+        <div className="flex items-center gap-2 mt-3">
+          <span className="text-amber-300 font-bold text-sm">{entry.price.toLocaleString()} 🪙</span>
+          <span className="text-amber-100/30 text-xs">×</span>
+          <input
+            type="number"
+            min={1}
+            max={Math.min(remaining, 99)}
+            value={qty}
+            onChange={e => setQty(Math.max(1, Math.min(remaining, Number(e.target.value) || 1)))}
+            className="w-12 bg-[#0f0a07] border border-amber-100/20 rounded text-center text-amber-100 text-sm py-0.5"
+            disabled={disabled || !hasStock}
+          />
+          <span className="text-amber-100/40 text-xs">= {total.toLocaleString()} 🪙</span>
+        </div>
+
+        <div className="flex items-center justify-end mt-2">
+          <button
+            onClick={() => onRequest(qty)}
+            disabled={disabled || !hasStock || !canAfford}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-amber-50 transition-colors"
+          >
+            {!hasStock ? 'Esgotado' : !canAfford ? 'Sem ouro' : 'Comprar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SellCard({
+  entry,
+  owned,
+  disabled,
+  onRequest,
+}: {
+  entry: NpcBuyEntry
+  owned: number
+  disabled: boolean
+  onRequest: (qty: number) => void
+}) {
+  const [qty, setQty] = useState(1)
+  const itemDef = ITEM_BY_ID[entry.itemId]
+  const total = entry.price * qty
+  const hasItems = owned > 0
+
+  if (!itemDef) return null
+
+  return (
+    <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[itemDef.rarity]} flex gap-3`}>
+      <div className="text-3xl w-10 text-center shrink-0 mt-0.5">{itemDef.icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
+          <span className="text-amber-100/30 text-[10px] capitalize">{itemDef.category}</span>
+        </div>
+        <p className="text-amber-100/35 text-xs mt-0.5">Você possui: {owned}</p>
+
+        <div className="flex items-center gap-2 mt-3">
+          <span className="text-emerald-400 font-bold text-sm">{entry.price.toLocaleString()} 🪙</span>
+          <span className="text-amber-100/30 text-xs">×</span>
+          <input
+            type="number"
+            min={1}
+            max={owned}
+            value={qty}
+            onChange={e => setQty(Math.max(1, Math.min(owned, Number(e.target.value) || 1)))}
+            className="w-12 bg-[#0f0a07] border border-amber-100/20 rounded text-center text-amber-100 text-sm py-0.5"
+            disabled={disabled || !hasItems}
+          />
+          <span className="text-amber-100/40 text-xs">= {total.toLocaleString()} 🪙</span>
+        </div>
+
+        <div className="flex items-center justify-end mt-2">
+          <button
+            onClick={() => onRequest(qty)}
+            disabled={disabled || !hasItems}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-800 hover:bg-emerald-700 disabled:opacity-40 text-emerald-50 transition-colors"
+          >
+            {!hasItems ? 'Sem itens' : 'Vender'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmModal({
+  mode,
+  itemId,
+  qty,
+  npcId,
+  heroGold,
+  stackableInventory,
+  npcPurchased,
+  npcSells,
+  npcBuys,
+  onChangeQty,
+  onConfirm,
+  onCancel,
+}: {
+  mode: ConfirmMode
+  itemId: string
+  qty: number
+  npcId: string
+  heroGold: number
+  stackableInventory: Record<string, number>
+  npcPurchased: Record<string, Record<string, number>>
+  npcSells: NpcSellEntry[]
+  npcBuys: NpcBuyEntry[]
+  onChangeQty: (qty: number) => void
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const itemDef = ITEM_BY_ID[itemId]
+  if (!itemDef) return null
+
+  const isBuy = mode === 'buy'
+  const entry = isBuy
+    ? npcSells.find(e => e.itemId === itemId)
+    : npcBuys.find(e => e.itemId === itemId)
+  if (!entry) return null
+
+  const price = entry.price
+  const total = price * qty
+
+  const maxQty = isBuy
+    ? (entry as NpcSellEntry).quantity - (npcPurchased[npcId]?.[itemId] ?? 0)
+    : (stackableInventory[itemId] ?? 0)
+
+  const canProceed = isBuy ? heroGold >= total : (stackableInventory[itemId] ?? 0) >= qty
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onCancel}>
+      <div
+        className="bg-[#1a140f] border border-amber-800/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-amber-100 font-bold text-lg text-center mb-1">
+          {isBuy ? 'Confirmar Compra' : 'Confirmar Venda'}
+        </p>
+        <p className="text-amber-100/40 text-xs text-center mb-5">
+          {isBuy ? 'Você está comprando:' : 'Você está vendendo:'}
+        </p>
+
+        <div className="flex items-center gap-3 bg-[#120e0a] rounded-xl p-3 mb-5">
+          <span className="text-3xl">{itemDef.icon}</span>
+          <div>
+            <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
+            <p className="text-amber-100/40 text-xs">{price.toLocaleString()} 🪙 por unidade</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-amber-100/60 text-sm">Quantidade:</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onChangeQty(Math.max(1, qty - 1))}
+              className="w-7 h-7 rounded-lg bg-amber-900/40 hover:bg-amber-800/60 text-amber-100 text-sm font-bold"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={maxQty}
+              value={qty}
+              onChange={e => onChangeQty(Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))}
+              className="w-14 bg-[#0f0a07] border border-amber-100/20 rounded text-center text-amber-100 text-sm py-1"
+            />
+            <button
+              onClick={() => onChangeQty(Math.min(maxQty, qty + 1))}
+              className="w-7 h-7 rounded-lg bg-amber-900/40 hover:bg-amber-800/60 text-amber-100 text-sm font-bold"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between bg-[#120e0a] rounded-xl px-4 py-3 mb-5">
+          <span className="text-amber-100/60 text-sm">Total:</span>
+          <span className={`font-bold text-lg ${isBuy ? 'text-amber-300' : 'text-emerald-400'}`}>
+            {isBuy ? '−' : '+'}{total.toLocaleString()} 🪙
+          </span>
+        </div>
+
+        {isBuy && heroGold < total && (
+          <p className="text-red-400 text-xs text-center mb-3">Ouro insuficiente.</p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#18120d] border border-amber-900/30 text-amber-100/60 hover:text-amber-100 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!canProceed}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold disabled:opacity-40 transition-colors ${isBuy ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' : 'bg-emerald-800 hover:bg-emerald-700 text-emerald-50'}`}
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

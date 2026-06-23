@@ -4,10 +4,8 @@ import { druidClass } from './Druid.js'
 import { knightClass } from './Knight.js'
 import { mageClass } from './Mage.js'
 import { paladinClass } from './Paladin.js'
-import { warriorClass } from './Warrior.js'
 
 export const HERO_CLASSES: HeroClassDefinition[] = [
-  warriorClass,
   archerClass,
   mageClass,
   knightClass,

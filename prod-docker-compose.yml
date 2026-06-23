@@ -38,8 +38,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: apps/api/Dockerfile.prod
     container_name: mayhero-api
     restart: unless-stopped
     expose:
@@ -65,14 +65,14 @@ services:
       - nginx_web
     command: >
       sh -c "
-        node_modules/.bin/prisma db push &&
-        node dist/server.js
+        npx prisma db push &&
+        node /app/node_modules/.bin/tsx src/server.ts
       "
 
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: apps/web/Dockerfile.prod
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://mayhero.com.br/api}
     container_name: mayhero

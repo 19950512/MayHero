@@ -1,71 +1,21 @@
-export type HeroClass = 'warrior' | 'archer' | 'mage' | 'paladin' | 'druid' | 'knight'
+export type {
+  Stats, Enemy, MonsterDrop, MonsterDefinition, Dungeon, City,
+  ItemRarity, ItemCategory, EquipmentSlot, EquipmentBonuses,
+  BaseItemDefinition, EquipmentItemDefinition, StackableItemDefinition, ItemDefinition,
+} from '@mayhero/shared'
+import type { Stats, Enemy, EquipmentBonuses } from '@mayhero/shared'
 
-export interface Stats {
-  hp: number
-  maxHp: number
-  mp: number
-  maxMp: number
-  atk: number
-  def: number
-  spd: number
-  crit: number // crit chance 0-100
-}
+export type HeroClass = 'warrior' | 'archer' | 'mage' | 'paladin' | 'druid' | 'knight'
 
 export interface Equipment {
   id: string
   name: string
   slot: 'weapon' | 'armor' | 'helm' | 'ring'
   rarity: 'common' | 'rare' | 'epic' | 'legendary'
-  bonuses: Partial<Omit<Stats, 'hp' | 'mp' | 'maxHp' | 'maxMp'>> & {
-    maxHp?: number
-    maxMp?: number
-  }
-  icon: string
-  requiredLevel: number
-  enhancement?: number  // 0-20
-}
-
-export type EquipmentBonuses = Equipment['bonuses']
-export type ItemRarity = Equipment['rarity']
-export type ItemCategory = 'equipment' | 'consumable' | 'currency' | 'material'
-
-export interface BaseItemDefinition {
-  id: string
-  name: string
-  icon: string
-  rarity: ItemRarity
-  category: ItemCategory
-  stackable: boolean
-  maxStack?: number
-}
-
-export interface EquipmentItemDefinition extends BaseItemDefinition {
-  category: 'equipment'
-  stackable: false
-  slot: Equipment['slot']
-  type: 'weapon' | 'armor' | 'helmet' | 'ring'
   bonuses: EquipmentBonuses
+  icon: string
   requiredLevel: number
-  enhanceable?: boolean
-}
-
-export interface StackableItemDefinition extends BaseItemDefinition {
-  category: 'consumable' | 'currency' | 'material'
-  stackable: true
-  maxStack: number
-}
-
-export type ItemDefinition = EquipmentItemDefinition | StackableItemDefinition
-
-export interface MonsterDrop {
-  itemId: string
-  chance: number
-  minQuantity?: number
-  maxQuantity?: number
-}
-
-export interface MonsterDefinition extends Enemy {
-  drops: MonsterDrop[]
+  enhancement?: number
 }
 
 export interface HeroClassDefinition {
@@ -74,6 +24,7 @@ export interface HeroClassDefinition {
   shortName: string
   description: string
   sigil: string
+  sprite?: string
   themeColor: string
   baseStats: Stats
   statGrowth: Partial<Stats>
@@ -144,35 +95,6 @@ export interface Hero {
   skillAllocations: SkillAllocations
 }
 
-export interface Enemy {
-  id: string
-  name: string
-  emoji: string
-  stats: Stats
-  xpReward: number
-  goldReward: [number, number] // min, max
-  isBoss: boolean
-}
-
-export interface Dungeon {
-  id: string
-  name: string
-  description: string
-  lore?: string
-  minLevel: number
-  recommendedLevel: number
-  bossEvery: number
-  zoneId: number // maps to API zone number for backend compatibility
-  monsters: MonsterDefinition[]
-}
-
-export interface City {
-  id: string
-  name: string
-  description: string
-  dungeons: Dungeon[]
-}
-
 export interface BattleLog {
   id: string
   turn: number
@@ -192,4 +114,3 @@ export interface BattleState {
   phase: 'fighting' | 'victory' | 'defeat' | 'idle'
   lastTickAt: number
 }
-

@@ -48,6 +48,7 @@ export function MenuScreen({ onNavigate }: Props) {
         { icon: '🛒', label: 'Mercado',    description: 'Comprar e vender itens', action: { type: 'link', href: '/shop'   } },
         { icon: '⚒️', label: 'Ferreiro',   description: 'Loja de equipamentos',   action: { type: 'link', href: '/loja'   } },
         { icon: '🔨', label: 'Forja',      description: 'Aprimorar equipamentos', action: { type: 'link', href: '/forja'  } },
+        { icon: '🧙', label: 'NPCs',       description: 'Personagens e negócios', action: { type: 'link', href: '/npcs'   } },
       ],
     },
     {

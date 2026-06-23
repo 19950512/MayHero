@@ -1,19 +1,24 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 WORKDIR /app
-COPY package.json ./
-RUN npm install
-COPY prisma ./prisma
-RUN npx prisma generate
-COPY src ./src
-COPY tsconfig.json ./
-RUN npm run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
+# Copy workspace manifest (needed for npm workspaces)
 COPY package.json ./
-COPY prisma ./prisma
+
+# Copy shared package source (tsx resolves .ts at runtime)
+COPY packages/shared/ packages/shared/
+
+# Copy API package files
+COPY apps/api/package.json apps/api/
+COPY apps/api/prisma/ apps/api/prisma/
+COPY apps/api/src/ apps/api/src/
+
+# Install all deps (including devDeps for prisma CLI)
+RUN npm install --workspace=@mayhero/shared --workspace=@mayhero/api --include=dev
+
+# Generate Prisma client
+RUN cd apps/api && npx prisma generate
+
+ENV NODE_ENV=production
+WORKDIR /app/apps/api
 EXPOSE 3070
-CMD ["node", "dist/server.js"]
+CMD ["node", "/app/node_modules/.bin/tsx", "src/server.ts"]

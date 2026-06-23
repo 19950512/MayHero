@@ -1,67 +1,21 @@
-import type { Equipment, EquipmentItemDefinition, ItemDefinition } from '../types'
-import { AnelDaVelocidade } from './AnelDaVelocidade'
-import { AnelDeCobre } from './AnelDeCobre'
-import { AnelDoPoder } from './AnelDoPoder'
-import { ArmaduraDeCouro } from './ArmaduraDeCouro'
-import { ArmaduraDePlacas } from './ArmaduraDePlacas'
-import { ArmaduraDraconica } from './ArmaduraDraconica'
-import { CajadoDeCarvalho } from './CajadoDeCarvalho'
-import { CajadoDeFogo } from './CajadoDeFogo'
-import { Capuz } from './Capuz'
-import { CoroaDoRei } from './CoroaDoRei'
-import { CotaDeMalha } from './CotaDeMalha'
-import { ElmoDeFerro } from './ElmoDeFerro'
-import { EspadaDeAco } from './EspadaDeAco'
-import { EspadaDeFerro } from './EspadaDeFerro'
-import { Excalibur } from './Excalibur'
-import { Galho } from './Galho'
-import { Gold } from './Gold'
-import { LaminaSombria } from './LaminaSombria'
-import { PocaoDeVida } from './PocaoDeVida'
-import { RoupaDeTecido } from './RoupaDeTecido'
-import { ArcoDoCacador } from './ArcoDoCacador'
-import { NucleoBaixo } from './NucleoBaixo'
-import { NucleoMedio } from './NucleoMedio'
-import { NucleoAlto } from './NucleoAlto'
-import { NucleoAltissimo } from './NucleoAltissimo'
-import { NucleoBaixoPerfeito } from './NucleoBaixoPerfeito'
-import { NucleoMedioPerfeito } from './NucleoMedioPerfeito'
-import { NucleoAltoPerfeito } from './NucleoAltoPerfeito'
-import { NucleoAltissimoPerfeito } from './NucleoAltissimoPerfeito'
+import type { EquipmentItemDefinition } from '@mayhero/shared'
+import type { Equipment } from '../types'
 
-export const ITEM_CATALOG: ItemDefinition[] = [
-  Galho,
-  EspadaDeFerro,
-  ArcoDoCacador,
-  CajadoDeCarvalho,
-  EspadaDeAco,
-  CajadoDeFogo,
-  LaminaSombria,
-  Excalibur,
-  RoupaDeTecido,
-  ArmaduraDeCouro,
-  CotaDeMalha,
-  ArmaduraDePlacas,
-  ArmaduraDraconica,
-  Capuz,
-  ElmoDeFerro,
-  CoroaDoRei,
-  AnelDeCobre,
-  AnelDaVelocidade,
-  AnelDoPoder,
+export {
+  RingOfHealing,
+  GoldCoin,
   PocaoDeVida,
-  Gold,
-  NucleoBaixo,
-  NucleoMedio,
-  NucleoAlto,
-  NucleoAltissimo,
-  NucleoBaixoPerfeito,
-  NucleoMedioPerfeito,
-  NucleoAltoPerfeito,
-  NucleoAltissimoPerfeito,
-]
+  NucleoBaixo, NucleoMedio, NucleoAlto, NucleoAltissimo,
+  NucleoBaixoPerfeito, NucleoMedioPerfeito, NucleoAltoPerfeito, NucleoAltissimoPerfeito,
+  ITEMS as ITEM_CATALOG,
+  ITEM_BY_ID,
+} from '@mayhero/shared'
 
-export const EQUIPMENT_POOL: Equipment[] = ITEM_CATALOG
+export type { ItemDefinition, EquipmentItemDefinition, StackableItemDefinition } from '@mayhero/shared'
+
+import { ITEMS } from '@mayhero/shared'
+
+export const EQUIPMENT_POOL: Equipment[] = ITEMS
   .filter((item): item is EquipmentItemDefinition => item.category === 'equipment')
   .map(item => ({
     id: item.id,
@@ -72,7 +26,3 @@ export const EQUIPMENT_POOL: Equipment[] = ITEM_CATALOG
     icon: item.icon,
     requiredLevel: item.requiredLevel,
   }))
-
-export const ITEM_BY_ID: Record<string, ItemDefinition> = Object.fromEntries(
-  ITEM_CATALOG.map(item => [item.id, item])
-)

@@ -256,7 +256,7 @@ export async function heroRoutes(app: FastifyInstance) {
     const monster = getMonsterById(body.data.enemyId)
     if (!monster) return reply.status(400).send({ error: 'Inimigo inválido.' })
 
-    if (monster.zone !== body.data.currentZone || hero.currentZone !== body.data.currentZone) {
+    if (!monster.zones.includes(body.data.currentZone) || hero.currentZone !== body.data.currentZone) {
       return reply.status(400).send({ error: 'Zona inválida para batalha.' })
     }
 
@@ -421,7 +421,7 @@ export async function heroRoutes(app: FastifyInstance) {
     const killsInZone = Number(killsInZoneRaw ?? '0')
     const isBoss = killsInZone > 0 && killsInZone % BOSS_EVERY === 0
 
-    const pool = MONSTERS.filter(m => m.zone === body.data.currentZone && m.isBoss === isBoss)
+    const pool = MONSTERS.filter(m => m.zones.includes(body.data.currentZone) && m.isBoss === isBoss)
     if (pool.length === 0) {
       return reply.status(500).send({ error: 'Catálogo de monstros inválido para a zona.' })
     }

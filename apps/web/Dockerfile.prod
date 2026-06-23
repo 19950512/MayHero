@@ -1,10 +1,27 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Copy workspace manifest
 COPY package.json ./
-RUN npm install
-COPY next.config.ts postcss.config.mjs tsconfig.json eslint.config.mjs ./
-COPY public ./public
-COPY app ./app
+
+# Copy shared package source (transpilePackages processes it at build time)
+COPY packages/shared/ packages/shared/
+
+# Copy web package files
+COPY apps/web/package.json apps/web/
+COPY apps/web/next.config.ts apps/web/
+COPY apps/web/postcss.config.mjs apps/web/
+COPY apps/web/tsconfig.json apps/web/
+COPY apps/web/eslint.config.mjs apps/web/
+
+# Install workspace deps
+RUN npm install --workspace=@mayhero/shared --workspace=@mayhero/web
+
+# Copy source and build
+COPY apps/web/public/ apps/web/public/
+COPY apps/web/app/ apps/web/app/
+
+WORKDIR /app/apps/web
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
@@ -12,9 +29,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY package.json ./
+COPY --from=builder /app/apps/web/.next apps/web/.next
+COPY --from=builder /app/node_modules node_modules
+COPY --from=builder /app/packages/shared packages/shared
+COPY --from=builder /app/apps/web/public apps/web/public
+COPY --from=builder /app/apps/web/package.json apps/web/
+WORKDIR /app/apps/web
 EXPOSE 3000
-CMD ["node_modules/.bin/next", "start", "-p", "3000"]
+CMD ["/app/node_modules/.bin/next", "start", "-p", "3000"]

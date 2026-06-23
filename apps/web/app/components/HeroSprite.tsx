@@ -1,7 +1,10 @@
 'use client'
 
+import { useState } from 'react'
+import Image from 'next/image'
 import type { Hero } from '../game/types'
 import { CLASS_ICONS } from '../game/data'
+import { HERO_CLASS_BY_ID } from '../game/classes'
 
 interface Props {
   hero: Hero
@@ -19,6 +22,9 @@ const CLASS_COLORS: Record<string, string> = {
 }
 
 export function HeroSprite({ hero, isAttacking, isDead }: Props) {
+  const classData = HERO_CLASS_BY_ID[hero.class]
+  const [spriteError, setSpriteError] = useState(false)
+
   return (
     <div
       className={`
@@ -27,17 +33,41 @@ export function HeroSprite({ hero, isAttacking, isDead }: Props) {
         ${isDead ? 'opacity-30 grayscale' : ''}
       `}
     >
-      <div
-        className={`
-          w-14 h-14 rounded-full bg-gradient-to-b ${CLASS_COLORS[hero.class]}
-          flex items-center justify-center text-xs font-bold tracking-widest
-          shadow-lg border-2 border-amber-100/30 text-amber-50
-          ${isAttacking ? 'scale-110' : ''}
-          transition-transform duration-150
-        `}
-      >
-        {CLASS_ICONS[hero.class]}
-      </div>
+      {classData?.sprite && !spriteError
+        ? (
+          <div
+            className={`
+              w-14 h-14 rounded-full relative overflow-hidden
+              shadow-lg border-2 border-amber-100/30
+              bg-gradient-to-b ${CLASS_COLORS[hero.class]}
+              ${isAttacking ? 'scale-110' : ''}
+              transition-transform duration-150
+            `}
+          >
+            <Image
+              src={classData.sprite}
+              alt={classData.name}
+              fill
+              unoptimized
+              className="object-contain"
+              onError={() => setSpriteError(true)}
+            />
+          </div>
+        )
+        : (
+          <div
+            className={`
+              w-14 h-14 rounded-full bg-gradient-to-b ${CLASS_COLORS[hero.class]}
+              flex items-center justify-center text-xs font-bold tracking-widest
+              shadow-lg border-2 border-amber-100/30 text-amber-50
+              ${isAttacking ? 'scale-110' : ''}
+              transition-transform duration-150
+            `}
+          >
+            {CLASS_ICONS[hero.class]}
+          </div>
+        )
+      }
       <span className="text-xs font-bold text-white/80 truncate max-w-[64px] text-center">
         {hero.name}
       </span>

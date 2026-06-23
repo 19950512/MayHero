@@ -1,3 +1,6 @@
+import { MONSTERS as SHARED_MONSTERS, DUNGEONS, ITEMS } from '@mayhero/shared'
+import type { MonsterDrop, EquipmentItemDefinition } from '@mayhero/shared'
+
 type HeroClass = 'warrior' | 'archer' | 'mage' | 'knight' | 'paladin' | 'druid'
 
 type Stats = {
@@ -31,7 +34,7 @@ export interface EquipmentItemData {
   bonuses: EquipmentBonuses
   icon: string
   requiredLevel: number
-  enhancement?: number  // 0-20
+  enhancement?: number
 }
 
 export const HERO_CLASSES: readonly HeroClass[] = ['warrior', 'archer', 'mage', 'knight', 'paladin', 'druid'] as const
@@ -62,27 +65,18 @@ export const ZONE_MIN_LEVEL: Record<number, number> = {
 
 export const BOSS_EVERY = 10
 
-export const EQUIPMENT_CATALOG: EquipmentItemData[] = [
-  { id: 'stick', name: 'Galho', slot: 'weapon', rarity: 'common', bonuses: { atk: 2 }, icon: '🪵', requiredLevel: 1 },
-  { id: 'iron_sword', name: 'Espada de Ferro', slot: 'weapon', rarity: 'common', bonuses: { atk: 5, def: 1 }, icon: '⚔️', requiredLevel: 2 },
-  { id: 'hunters_bow', name: 'Arco do Caçador', slot: 'weapon', rarity: 'common', bonuses: { atk: 6, spd: 1 }, icon: '🏹', requiredLevel: 2 },
-  { id: 'oak_staff', name: 'Cajado de Carvalho', slot: 'weapon', rarity: 'common', bonuses: { atk: 7, crit: 2 }, icon: '🪄', requiredLevel: 2 },
-  { id: 'steel_sword', name: 'Espada de Aço', slot: 'weapon', rarity: 'rare', bonuses: { atk: 12, def: 2 }, icon: '🗡️', requiredLevel: 5 },
-  { id: 'fire_staff', name: 'Cajado de Fogo', slot: 'weapon', rarity: 'rare', bonuses: { atk: 18, crit: 5 }, icon: '🔥', requiredLevel: 7 },
-  { id: 'dark_blade', name: 'Lâmina Sombria', slot: 'weapon', rarity: 'epic', bonuses: { atk: 28, crit: 8, spd: 2 }, icon: '🌑', requiredLevel: 10 },
-  { id: 'excalibur', name: 'Excalibur', slot: 'weapon', rarity: 'legendary', bonuses: { atk: 50, def: 10, crit: 12 }, icon: '✨', requiredLevel: 15 },
-  { id: 'cloth', name: 'Roupa de Tecido', slot: 'armor', rarity: 'common', bonuses: { def: 2 }, icon: '👕', requiredLevel: 1 },
-  { id: 'leather_armor', name: 'Armadura de Couro', slot: 'armor', rarity: 'common', bonuses: { def: 5, maxHp: 10 }, icon: '🥋', requiredLevel: 2 },
-  { id: 'chain_mail', name: 'Cota de Malha', slot: 'armor', rarity: 'rare', bonuses: { def: 10, maxHp: 25 }, icon: '🛡️', requiredLevel: 5 },
-  { id: 'plate_armor', name: 'Armadura de Placas', slot: 'armor', rarity: 'epic', bonuses: { def: 18, maxHp: 60 }, icon: '⚜️', requiredLevel: 10 },
-  { id: 'dragon_armor', name: 'Armadura Dracônica', slot: 'armor', rarity: 'legendary', bonuses: { def: 35, maxHp: 120 }, icon: '🐉', requiredLevel: 15 },
-  { id: 'hood', name: 'Capuz', slot: 'helm', rarity: 'common', bonuses: { def: 1 }, icon: '🪖', requiredLevel: 1 },
-  { id: 'iron_helm', name: 'Elmo de Ferro', slot: 'helm', rarity: 'common', bonuses: { def: 3, maxHp: 8 }, icon: '⛑️', requiredLevel: 3 },
-  { id: 'crown', name: 'Coroa do Rei', slot: 'helm', rarity: 'epic', bonuses: { def: 8, maxHp: 30, crit: 5 }, icon: '👑', requiredLevel: 10 },
-  { id: 'copper_ring', name: 'Anel de Cobre', slot: 'ring', rarity: 'common', bonuses: { atk: 1 }, icon: '💍', requiredLevel: 1 },
-  { id: 'speed_ring', name: 'Anel da Velocidade', slot: 'ring', rarity: 'rare', bonuses: { spd: 3, crit: 4 }, icon: '💨', requiredLevel: 5 },
-  { id: 'power_ring', name: 'Anel do Poder', slot: 'ring', rarity: 'epic', bonuses: { atk: 15, crit: 6 }, icon: '🔮', requiredLevel: 10 },
-]
+export const EQUIPMENT_CATALOG: EquipmentItemData[] = (
+  ITEMS.filter((item): item is EquipmentItemDefinition => item.category === 'equipment')
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      slot: item.slot as EquipmentSlot,
+      rarity: item.rarity as Rarity,
+      bonuses: item.bonuses as EquipmentBonuses,
+      icon: item.icon,
+      requiredLevel: item.requiredLevel,
+    }))
+)
 
 const EQUIPMENT_BY_ID = new Map(EQUIPMENT_CATALOG.map(item => [item.id, item]))
 
@@ -119,116 +113,71 @@ type CatalogItem = {
   requiredLevel?: number
 }
 
-type MonsterDrop = {
-  itemId: string
-  chance: number
-  minQuantity?: number
-  maxQuantity?: number
-}
-
+// Server-side monster type: shared fields + zones derived from dungeon definitions
 export type MonsterDefinition = {
   id: string
-  zone: number
+  zones: number[]
   isBoss: boolean
   xpReward: number
   goldReward: [number, number]
   drops: MonsterDrop[]
 }
 
-const CATALOG_ITEMS: CatalogItem[] = [
-  ...EQUIPMENT_CATALOG.map(item => ({
-    id: item.id,
-    name: item.name,
-    icon: item.icon,
-    rarity: item.rarity,
-    category: 'equipment' as const,
-    stackable: false,
-    slot: item.slot,
-    bonuses: item.bonuses,
-    requiredLevel: item.requiredLevel,
-  })),
-  { id: 'healing_potion', name: 'Poção de Vida', icon: '🧪', rarity: 'common', category: 'consumable', stackable: true },
-  { id: 'gold_coin', name: 'Gold', icon: '🪙', rarity: 'common', category: 'currency', stackable: true },
-  { id: 'nucleo_baixo', name: 'Núcleo de Aprimoramento Baixo', icon: '🔸', rarity: 'common', category: 'material', stackable: true },
-  { id: 'nucleo_medio', name: 'Núcleo de Aprimoramento Médio', icon: '🔶', rarity: 'rare', category: 'material', stackable: true },
-  { id: 'nucleo_alto', name: 'Núcleo de Aprimoramento Alto', icon: '💠', rarity: 'epic', category: 'material', stackable: true },
-  { id: 'nucleo_altissimo', name: 'Núcleo de Aprimoramento Altíssimo', icon: '💎', rarity: 'legendary', category: 'material', stackable: true },
-  { id: 'nucleo_baixo_perfeito', name: 'Núcleo Baixo Perfeito', icon: '✨', rarity: 'common', category: 'material', stackable: true },
-  { id: 'nucleo_medio_perfeito', name: 'Núcleo Médio Perfeito', icon: '🌟', rarity: 'rare', category: 'material', stackable: true },
-  { id: 'nucleo_alto_perfeito', name: 'Núcleo Alto Perfeito', icon: '⭐', rarity: 'epic', category: 'material', stackable: true },
-  { id: 'nucleo_altissimo_perfeito', name: 'Núcleo Altíssimo Perfeito', icon: '🏆', rarity: 'legendary', category: 'material', stackable: true },
-]
+// Build zone assignments automatically from dungeon definitions — single source of truth
+function buildZoneMap(): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>()
+  for (const dungeon of DUNGEONS) {
+    for (const monster of dungeon.monsters) {
+      if (!map.has(monster.id)) map.set(monster.id, new Set())
+      map.get(monster.id)!.add(dungeon.zoneId)
+    }
+  }
+  return map
+}
 
-const CATALOG_ITEM_BY_ID = new Map(CATALOG_ITEMS.map(item => [item.id, item]))
+const ZONE_MAP = buildZoneMap()
 
-export const MONSTERS: MonsterDefinition[] = [
-  { id: 'slime', zone: 1, isBoss: false, xpReward: 8, goldReward: [1, 4], drops: [
-    { itemId: 'hood', chance: 0.03 }, { itemId: 'stick', chance: 0.03 },
-    { itemId: 'healing_potion', chance: 0.12, minQuantity: 1, maxQuantity: 2 },
-    { itemId: 'gold_coin', chance: 0.55, minQuantity: 1, maxQuantity: 5 },
-  ] },
-  { id: 'bat', zone: 1, isBoss: false, xpReward: 10, goldReward: [2, 5], drops: [
-    { itemId: 'copper_ring', chance: 0.05 }, { itemId: 'hunters_bow', chance: 0.03 },
-    { itemId: 'healing_potion', chance: 0.1, minQuantity: 1, maxQuantity: 2 },
-    { itemId: 'gold_coin', chance: 0.6, minQuantity: 2, maxQuantity: 6 },
-  ] },
-  { id: 'goblin', zone: 1, isBoss: false, xpReward: 14, goldReward: [3, 7], drops: [
-    { itemId: 'iron_sword', chance: 0.04 }, { itemId: 'leather_armor', chance: 0.04 },
-    { itemId: 'healing_potion', chance: 0.12, minQuantity: 1, maxQuantity: 2 },
-    { itemId: 'gold_coin', chance: 0.7, minQuantity: 3, maxQuantity: 8 },
-  ] },
-  { id: 'wolf', zone: 1, isBoss: false, xpReward: 18, goldReward: [2, 6], drops: [
-    { itemId: 'speed_ring', chance: 0.03 }, { itemId: 'oak_staff', chance: 0.03 },
-    { itemId: 'healing_potion', chance: 0.14, minQuantity: 1, maxQuantity: 3 },
-    { itemId: 'gold_coin', chance: 0.65, minQuantity: 2, maxQuantity: 7 },
-  ] },
-  { id: 'orc_boss', zone: 1, isBoss: true, xpReward: 60, goldReward: [15, 30], drops: [
-    { itemId: 'chain_mail', chance: 0.15 }, { itemId: 'iron_helm', chance: 0.14 },
-    { itemId: 'healing_potion', chance: 0.4, minQuantity: 2, maxQuantity: 4 },
-    { itemId: 'gold_coin', chance: 1, minQuantity: 20, maxQuantity: 45 },
-  ] },
-  { id: 'skeleton', zone: 2, isBoss: false, xpReward: 28, goldReward: [6, 12], drops: [
-    { itemId: 'steel_sword', chance: 0.05 }, { itemId: 'chain_mail', chance: 0.04 },
-    { itemId: 'healing_potion', chance: 0.16, minQuantity: 1, maxQuantity: 3 },
-    { itemId: 'gold_coin', chance: 0.72, minQuantity: 7, maxQuantity: 15 },
-  ] },
-  { id: 'spider', zone: 2, isBoss: false, xpReward: 32, goldReward: [8, 14], drops: [
-    { itemId: 'speed_ring', chance: 0.05 }, { itemId: 'fire_staff', chance: 0.03 },
-    { itemId: 'healing_potion', chance: 0.2, minQuantity: 1, maxQuantity: 3 },
-    { itemId: 'gold_coin', chance: 0.75, minQuantity: 8, maxQuantity: 16 },
-  ] },
-  { id: 'troll', zone: 2, isBoss: false, xpReward: 40, goldReward: [10, 18], drops: [
-    { itemId: 'plate_armor', chance: 0.04 }, { itemId: 'power_ring', chance: 0.03 },
-    { itemId: 'healing_potion', chance: 0.22, minQuantity: 2, maxQuantity: 4 },
-    { itemId: 'gold_coin', chance: 0.8, minQuantity: 12, maxQuantity: 22 },
-  ] },
-  { id: 'stone_golem_boss', zone: 2, isBoss: true, xpReward: 150, goldReward: [40, 80], drops: [
-    { itemId: 'plate_armor', chance: 0.2 }, { itemId: 'crown', chance: 0.16 }, { itemId: 'dark_blade', chance: 0.1 },
-    { itemId: 'healing_potion', chance: 0.5, minQuantity: 3, maxQuantity: 6 },
-    { itemId: 'gold_coin', chance: 1, minQuantity: 55, maxQuantity: 110 },
-  ] },
-  { id: 'zombie_mage', zone: 3, isBoss: false, xpReward: 55, goldReward: [15, 25], drops: [
-    { itemId: 'fire_staff', chance: 0.08 }, { itemId: 'power_ring', chance: 0.06 },
-    { itemId: 'healing_potion', chance: 0.24, minQuantity: 2, maxQuantity: 5 },
-    { itemId: 'gold_coin', chance: 0.85, minQuantity: 18, maxQuantity: 32 },
-  ] },
-  { id: 'demon', zone: 3, isBoss: false, xpReward: 65, goldReward: [18, 32], drops: [
-    { itemId: 'dark_blade', chance: 0.07 }, { itemId: 'dragon_armor', chance: 0.04 },
-    { itemId: 'healing_potion', chance: 0.28, minQuantity: 2, maxQuantity: 5 },
-    { itemId: 'gold_coin', chance: 0.88, minQuantity: 20, maxQuantity: 35 },
-  ] },
-  { id: 'shadow_boss', zone: 3, isBoss: true, xpReward: 350, goldReward: [100, 200], drops: [
-    { itemId: 'excalibur', chance: 0.12 }, { itemId: 'dragon_armor', chance: 0.22 }, { itemId: 'crown', chance: 0.2 },
-    { itemId: 'healing_potion', chance: 0.7, minQuantity: 4, maxQuantity: 8 },
-    { itemId: 'gold_coin', chance: 1, minQuantity: 150, maxQuantity: 280 },
-  ] },
-]
+export const MONSTERS: MonsterDefinition[] = SHARED_MONSTERS
+  .filter(m => ZONE_MAP.has(m.id))
+  .map(m => ({
+    id: m.id,
+    zones: Array.from(ZONE_MAP.get(m.id)!),
+    isBoss: m.isBoss,
+    xpReward: m.xpReward,
+    goldReward: m.goldReward,
+    drops: m.drops,
+  }))
 
-const MONSTER_BY_ID = new Map(MONSTERS.map(monster => [monster.id, monster]))
+const MONSTER_BY_ID = new Map(MONSTERS.map(m => [m.id, m]))
 
 export function getMonsterById(enemyId: string): MonsterDefinition | null {
   return MONSTER_BY_ID.get(enemyId) ?? null
 }
+
+const CATALOG_ITEMS: CatalogItem[] = ITEMS.map(item =>
+  item.category === 'equipment'
+    ? {
+        id: item.id,
+        name: item.name,
+        icon: item.icon,
+        rarity: item.rarity as Rarity,
+        category: 'equipment' as const,
+        stackable: false,
+        slot: item.slot as EquipmentSlot,
+        bonuses: item.bonuses as EquipmentBonuses,
+        requiredLevel: item.requiredLevel,
+      }
+    : {
+        id: item.id,
+        name: item.name,
+        icon: item.icon,
+        rarity: item.rarity as Rarity,
+        category: item.category as ItemCategory,
+        stackable: true,
+      }
+)
+
+const CATALOG_ITEM_BY_ID = new Map(CATALOG_ITEMS.map(item => [item.id, item]))
 
 export function resolveMonsterDrops(enemyId: string): Array<{ item: CatalogItem; quantity: number }> {
   const monster = getMonsterById(enemyId)
