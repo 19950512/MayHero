@@ -8,6 +8,7 @@ import { computeStats, getHeroLoadout, normalizeSkillAllocationsForLevel } from 
 import { RARITY_COLORS } from '../game/data'
 import { HERO_CLASS_BY_ID } from '../game/classes'
 import { getItemDisplayName } from '../game/enhancement'
+import { ITEM_BY_ID } from '../game/items'
 import { ItemDetailModal } from './ItemDetailModal'
 import type { Equipment, SkillAllocStat } from '../game/types'
 
@@ -85,8 +86,11 @@ export function HeroStats() {
         className={`bg-black/25 rounded-lg p-2 border border-amber-100/10 ${item ? 'cursor-pointer hover:bg-amber-900/15 hover:border-amber-100/20 transition-colors' : ''}`}
       >
         <div className="flex items-center gap-2 mb-1">
-          <span className="w-6 h-6 rounded-md bg-amber-900/25 border border-amber-100/15 flex items-center justify-center text-sm">
-            {item?.icon ?? slot.emptyIcon}
+          <span className="w-6 h-6 rounded-md bg-amber-900/25 border border-amber-100/15 flex items-center justify-center text-sm overflow-hidden">
+            {item && ITEM_BY_ID[item.id]?.sprite
+              ? <img src={ITEM_BY_ID[item.id]!.sprite} alt={item.name} className="w-full h-full object-contain p-0.5" />
+              : (item?.icon ?? slot.emptyIcon)
+            }
           </span>
           <p className="text-[10px] uppercase tracking-wide text-amber-100/40 leading-tight">{slot.label}</p>
         </div>

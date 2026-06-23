@@ -1,7 +1,11 @@
+import { RingOfHealing } from '@mayhero/shared'
 import type { NpcBuyEntry } from '../types'
+import { HealthPotion, NucleoBaixo, NucleoMedio } from '../../../../../../packages/shared/src/items'
 
 export const HeitorCompra: NpcBuyEntry[] = [
-  { itemId: 'healing_potion', price: 15  },
-  { itemId: 'nucleo_baixo',   price: 45  },
-  { itemId: 'nucleo_medio',   price: 110 },
+  { itemId: HealthPotion.id, price: 15  },
+  { itemId: NucleoBaixo.id,   price: 45  },
+  { itemId: NucleoMedio.id,   price: 110 },
+  { itemId: RingOfHealing.id, price: 300,},
+
 ]

@@ -6,6 +6,7 @@ import { NPC_BY_ID } from '../../game/npcs'
 import type { NpcSellEntry, NpcBuyEntry } from '../../game/npcs'
 import { ITEM_BY_ID } from '../../game/items'
 import { useGameStore } from '../../store/gameStore'
+import { api } from '../../lib/api'
 import { PageHeader } from '../../components/PageHeader'
 
 const RARITY_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ export default function NpcPage({ params }: { params: Promise<{ id: string }> })
   const npc = NPC_BY_ID[id]
   if (!npc) notFound()
 
-  const { hero, stackableInventory, npcPurchased, buyFromNpc, sellToNpc } = useGameStore()
+  const { hero, inventory, stackableInventory, npcPurchased, buyFromNpc, sellToNpc, applyNpcEquipmentSell } = useGameStore()
 
   const [tab, setTab] = useState<'comprar' | 'vender'>('comprar')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
@@ -52,14 +53,27 @@ export default function NpcPage({ params }: { params: Promise<{ id: string }> })
     setTimeout(() => setMsg(null), 3500)
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!confirm) return
     if (confirm.mode === 'buy') {
       const result = buyFromNpc(npc.id, confirm.itemId, confirm.qty)
       flash(result.ok ? `Comprado com sucesso!` : (result.error ?? 'Erro.'), result.ok)
     } else {
-      const result = sellToNpc(npc.id, confirm.itemId, confirm.qty)
-      flash(result.ok ? `Vendido com sucesso!` : (result.error ?? 'Erro.'), result.ok)
+      const itemDef = ITEM_BY_ID[confirm.itemId]
+      if (itemDef?.stackable === false) {
+        // Equipment: venda feita no servidor para garantir persistência
+        try {
+          const result = await api.hero.npcSell({ npcId: npc.id, itemId: confirm.itemId, quantity: confirm.qty })
+          applyNpcEquipmentSell(confirm.itemId, confirm.qty, result.newGold)
+          flash('Vendido com sucesso!', true)
+        } catch (e) {
+          flash(e instanceof Error ? e.message : 'Erro ao vender.', false)
+        }
+      } else {
+        // Stackables: apenas estado local (servidor não rastreia por item)
+        const result = sellToNpc(npc.id, confirm.itemId, confirm.qty)
+        flash(result.ok ? `Vendido com sucesso!` : (result.error ?? 'Erro.'), result.ok)
+      }
     }
     setConfirm(null)
   }
@@ -130,15 +144,21 @@ export default function NpcPage({ params }: { params: Promise<{ id: string }> })
         {/* Sell tab */}
         {tab === 'vender' && (
           <div className="flex flex-col gap-3">
-            {npc.buys.map(entry => (
-              <SellCard
-                key={entry.itemId}
-                entry={entry}
-                owned={stackableInventory[entry.itemId] ?? 0}
-                disabled={!hero}
-                onRequest={(qty) => setConfirm({ mode: 'sell', itemId: entry.itemId, qty })}
-              />
-            ))}
+            {npc.buys.map(entry => {
+              const def = ITEM_BY_ID[entry.itemId]
+              const owned = def?.stackable !== false
+                ? (stackableInventory[entry.itemId] ?? 0)
+                : inventory.filter(i => i.id === entry.itemId).length
+              return (
+                <SellCard
+                  key={entry.itemId}
+                  entry={entry}
+                  owned={owned}
+                  disabled={!hero}
+                  onRequest={(qty) => setConfirm({ mode: 'sell', itemId: entry.itemId, qty })}
+                />
+              )
+            })}
           </div>
         )}
       </main>
@@ -152,6 +172,7 @@ export default function NpcPage({ params }: { params: Promise<{ id: string }> })
           npcId={npc.id}
           heroGold={hero?.gold ?? 0}
           stackableInventory={stackableInventory}
+          inventory={inventory}
           npcPurchased={npcPurchased}
           npcSells={npc.sells}
           npcBuys={npc.buys}
@@ -188,7 +209,12 @@ function BuyCard({
 
   return (
     <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[itemDef.rarity]} flex gap-3`}>
-      <div className="text-3xl w-10 text-center shrink-0 mt-0.5">{itemDef.icon}</div>
+      <div className="w-10 h-10 flex items-center justify-center shrink-0 mt-0.5">
+        {itemDef.sprite
+          ? <img src={itemDef.sprite} alt={itemDef.name} className="w-9 h-9 object-contain" />
+          : <span className="text-3xl">{itemDef.icon}</span>
+        }
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
@@ -245,7 +271,12 @@ function SellCard({
 
   return (
     <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[itemDef.rarity]} flex gap-3`}>
-      <div className="text-3xl w-10 text-center shrink-0 mt-0.5">{itemDef.icon}</div>
+      <div className="w-10 h-10 flex items-center justify-center shrink-0 mt-0.5">
+        {itemDef.sprite
+          ? <img src={itemDef.sprite} alt={itemDef.name} className="w-9 h-9 object-contain" />
+          : <span className="text-3xl">{itemDef.icon}</span>
+        }
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
@@ -289,6 +320,7 @@ function ConfirmModal({
   npcId,
   heroGold,
   stackableInventory,
+  inventory,
   npcPurchased,
   npcSells,
   npcBuys,
@@ -302,6 +334,7 @@ function ConfirmModal({
   npcId: string
   heroGold: number
   stackableInventory: Record<string, number>
+  inventory: { id: string }[]
   npcPurchased: Record<string, Record<string, number>>
   npcSells: NpcSellEntry[]
   npcBuys: NpcBuyEntry[]
@@ -321,11 +354,15 @@ function ConfirmModal({
   const price = entry.price
   const total = price * qty
 
+  const ownedQty = itemDef.stackable !== false
+    ? (stackableInventory[itemId] ?? 0)
+    : inventory.filter(i => i.id === itemId).length
+
   const maxQty = isBuy
     ? (entry as NpcSellEntry).quantity - (npcPurchased[npcId]?.[itemId] ?? 0)
-    : (stackableInventory[itemId] ?? 0)
+    : ownedQty
 
-  const canProceed = isBuy ? heroGold >= total : (stackableInventory[itemId] ?? 0) >= qty
+  const canProceed = isBuy ? heroGold >= total : ownedQty >= qty
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onCancel}>
@@ -341,7 +378,10 @@ function ConfirmModal({
         </p>
 
         <div className="flex items-center gap-3 bg-[#120e0a] rounded-xl p-3 mb-5">
-          <span className="text-3xl">{itemDef.icon}</span>
+          {itemDef.sprite
+            ? <img src={itemDef.sprite} alt={itemDef.name} className="w-9 h-9 object-contain" />
+            : <span className="text-3xl">{itemDef.icon}</span>
+          }
           <div>
             <p className={`font-bold text-sm ${RARITY_COLORS[itemDef.rarity]}`}>{itemDef.name}</p>
             <p className="text-amber-100/40 text-xs">{price.toLocaleString()} 🪙 por unidade</p>

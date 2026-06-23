@@ -117,6 +117,8 @@ export const api = {
           killsInZone: number
         }
       }>('POST', '/hero/battle/victory', data),
+    npcSell: (data: { npcId: string; itemId: string; quantity: number }) =>
+      req<{ ok: boolean; newGold: number }>('POST', '/hero/npc/sell', data),
     rename: (name: string) => req<{ ok: boolean; name: string }>('PATCH', '/hero/rename', { name }),
     search: (q: string) => req<HeroSearchResult[]>('GET', `/hero/search?q=${encodeURIComponent(q)}`),
     publicProfile: (name: string) => req<{

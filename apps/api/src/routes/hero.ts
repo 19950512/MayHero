@@ -44,6 +44,22 @@ const SyncHeroBody = z.object({
   stackableInventory: z.record(z.number().int().min(0)).optional(),
 })
 
+const NpcSellBody = z.object({
+  npcId: z.string().min(1),
+  itemId: z.string().min(1),
+  quantity: z.number().int().min(1).max(9999),
+})
+
+// Mirrors the client-side NPC buy lists — only equipment items need server-side removal
+const NPC_BUY_CATALOG: Record<string, Array<{ itemId: string; price: number }>> = {
+  heitor_maydana: [
+    { itemId: 'health_potion', price: 15 },
+    { itemId: 'nucleo_baixo',  price: 45 },
+    { itemId: 'nucleo_medio',  price: 110 },
+    { itemId: 'ring_of_healing', price: 300 },
+  ],
+}
+
 const BattleVictoryBody = z.object({
   encounterId: z.string().min(1),
   enemyId: z.string().min(1),
@@ -199,11 +215,53 @@ export async function heroRoutes(app: FastifyInstance) {
 
     // Inventory is server-authoritative and no longer overwritten by sync payload.
 
-    // Update Redis leaderboard
+    // Update gold from server-authoritative value after NPC sell
     await redis.zadd('leaderboard:level', updatedHero.level, hero.id)
     await redis.zadd('leaderboard:kills', updatedHero.totalKills, hero.id)
 
     return { ok: true }
+  })
+
+  app.post('/hero/npc/sell', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { sub } = req.user as { sub: string }
+    const body = NpcSellBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.issues[0].message })
+
+    const catalog = NPC_BUY_CATALOG[body.data.npcId]
+    if (!catalog) return reply.status(400).send({ error: 'NPC não encontrado.' })
+
+    const entry = catalog.find(e => e.itemId === body.data.itemId)
+    if (!entry) return reply.status(400).send({ error: 'NPC não compra este item.' })
+
+    const hero = await prisma.hero.findUnique({ where: { userId: sub } })
+    if (!hero) return reply.status(404).send({ error: 'Herói não encontrado.' })
+
+    const allItems = await prisma.inventoryItem.findMany({
+      where: { heroId: hero.id },
+      select: { id: true, itemData: true },
+    })
+
+    const matching = allItems.filter((item: { id: string; itemData: unknown }) => {
+      const data = item.itemData as Record<string, unknown>
+      return data.id === body.data.itemId
+    })
+
+    if (matching.length < body.data.quantity) {
+      return reply.status(400).send({ error: `Você possui apenas ${matching.length}.` })
+    }
+
+    const toDelete = matching.slice(0, body.data.quantity).map((i: { id: string }) => i.id)
+    const totalEarned = entry.price * body.data.quantity
+
+    const updatedHero = await prisma.$transaction(async (tx: typeof prisma) => {
+      await tx.inventoryItem.deleteMany({ where: { id: { in: toDelete } } })
+      return tx.hero.update({
+        where: { id: hero.id },
+        data: { gold: { increment: totalEarned } },
+      })
+    })
+
+    return { ok: true, newGold: updatedHero.gold }
   })
 
   app.post('/hero/battle/victory', { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -345,7 +403,7 @@ export async function heroRoutes(app: FastifyInstance) {
           hp: Math.max(1, Math.min(stats.maxHp, body.data.heroHpAfterBattle ?? stats.hp)),
         }
 
-    const updatedHero = await prisma.$transaction(async tx => {
+    const updatedHero = await prisma.$transaction(async (tx: typeof prisma) => {
       const savedHero = await tx.hero.update({
         where: { id: hero.id },
         data: {

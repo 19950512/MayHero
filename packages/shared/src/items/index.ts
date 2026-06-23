@@ -1,7 +1,7 @@
 import type { ItemDefinition, EquipmentItemDefinition } from '../types'
 import { RingOfHealing } from './RingOfHealing'
 import { GoldCoin } from './GoldCoin'
-import { PocaoDeVida } from './PocaoDeVida'
+import { HealthPotion } from './HealthPotion'
 import { NucleoBaixo } from './NucleoBaixo'
 import { NucleoMedio } from './NucleoMedio'
 import { NucleoAlto } from './NucleoAlto'
@@ -14,7 +14,7 @@ import { NucleoAltissimoPerfeito } from './NucleoAltissimoPerfeito'
 export {
   RingOfHealing,
   GoldCoin,
-  PocaoDeVida,
+  HealthPotion,
   NucleoBaixo, NucleoMedio, NucleoAlto, NucleoAltissimo,
   NucleoBaixoPerfeito, NucleoMedioPerfeito, NucleoAltoPerfeito, NucleoAltissimoPerfeito,
 }
@@ -22,7 +22,7 @@ export {
 export const ITEMS: ItemDefinition[] = [
   RingOfHealing,
   GoldCoin,
-  PocaoDeVida,
+  HealthPotion,
   NucleoBaixo, NucleoMedio, NucleoAlto, NucleoAltissimo,
   NucleoBaixoPerfeito, NucleoMedioPerfeito, NucleoAltoPerfeito, NucleoAltissimoPerfeito,
 ]

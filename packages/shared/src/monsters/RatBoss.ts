@@ -1,4 +1,4 @@
-import { GoldCoin, RingOfHealing } from '../items'
+import { GoldCoin, HealthPotion, RingOfHealing } from '../items'
 import type { MonsterDefinition } from '../types'
 
 export const RatBoss: MonsterDefinition = {
@@ -13,5 +13,6 @@ export const RatBoss: MonsterDefinition = {
   drops: [
     { itemId: GoldCoin.id, chance: 0.8, minQuantity: 5, maxQuantity: 20 },
     { itemId: RingOfHealing.id, chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+    { itemId: HealthPotion.id, chance: 0.5, minQuantity: 1, maxQuantity: 1 }
   ],
 }

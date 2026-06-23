@@ -4,7 +4,7 @@ import type { Equipment } from '../types'
 export {
   RingOfHealing,
   GoldCoin,
-  PocaoDeVida,
+  HealthPotion,
   NucleoBaixo, NucleoMedio, NucleoAlto, NucleoAltissimo,
   NucleoBaixoPerfeito, NucleoMedioPerfeito, NucleoAltoPerfeito, NucleoAltissimoPerfeito,
   ITEMS as ITEM_CATALOG,

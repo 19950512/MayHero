@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { NPC_STORE } from '../game/enhancement'
 import type { NpcStoreEntry } from '../game/enhancement'
+import { ITEM_BY_ID } from '../game/items'
 import { PageHeader } from '../components/PageHeader'
 
 const RARITY_COLORS: Record<string, string> = {
@@ -124,7 +125,12 @@ function CoreCard({
 
   return (
     <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[entry.rarity]} flex gap-3`}>
-      <div className="text-3xl w-10 text-center shrink-0 mt-0.5">{entry.icon}</div>
+      <div className="w-10 h-10 flex items-center justify-center shrink-0 mt-0.5">
+        {ITEM_BY_ID[entry.itemId]?.sprite
+          ? <img src={ITEM_BY_ID[entry.itemId]!.sprite} alt={entry.name} className="w-9 h-9 object-contain" />
+          : <span className="text-3xl">{entry.icon}</span>
+        }
+      </div>
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-sm ${RARITY_COLORS[entry.rarity]}`}>{entry.name}</p>
         <p className="text-amber-100/40 text-xs mt-0.5">{TIER_LABEL[entry.tier]}</p>

@@ -4,7 +4,7 @@ export const NucleoMedio: StackableItemDefinition = {
   id: 'nucleo_medio',
   name: 'Núcleo de Aprimoramento Médio',
   icon: '🔶',
-  sprite: '/assets/items/nucleo_medio.png',
+  sprite: '/assets/items/nucleo_de_aprimoramento_medio.png',
   rarity: 'rare',
   category: 'material',
   stackable: true,

@@ -80,6 +80,7 @@ interface GameState {
   buyFromNpcStore: (itemId: string, quantity: number) => { ok: boolean; error?: string }
   buyFromNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
   sellToNpc: (npcId: string, itemId: string, quantity: number) => { ok: boolean; error?: string }
+  applyNpcEquipmentSell: (itemId: string, quantity: number, newGold: number) => void
   startServerEncounter: (payload: { encounterId: string; enemyId: string }) => void
   applyServerVictoryResolution: (payload: {
     hero: {
@@ -360,11 +361,14 @@ export const useGameStore = create<GameState>()(
         const { hero, inventory } = get()
         if (!hero) return
         const { hero: updatedHero, replacedItem } = equipItem(hero, item)
-        const newInventory = inventory.filter(i => !(
+        const matchIdx = inventory.findIndex(i =>
           i.id === item.id && i.slot === item.slot &&
           i.rarity === item.rarity && i.name === item.name &&
           (i.enhancement ?? 0) === (item.enhancement ?? 0)
-        ))
+        )
+        const newInventory = matchIdx !== -1
+          ? [...inventory.slice(0, matchIdx), ...inventory.slice(matchIdx + 1)]
+          : [...inventory]
         if (replacedItem) newInventory.push(replacedItem)
         set({ hero: updatedHero, inventory: newInventory })
       },
@@ -500,7 +504,7 @@ export const useGameStore = create<GameState>()(
       },
 
       sellToNpc: (npcId, itemId, quantity) => {
-        const { hero, stackableInventory } = get()
+        const { hero, stackableInventory, inventory } = get()
         if (!hero) return { ok: false, error: 'Sem herói ativo.' }
 
         const npc = NPC_BY_ID[npcId]
@@ -509,17 +513,39 @@ export const useGameStore = create<GameState>()(
         const entry = npc.buys.find(e => e.itemId === itemId)
         if (!entry) return { ok: false, error: 'NPC não compra este item.' }
 
-        const owned = stackableInventory[itemId] ?? 0
-        if (owned < quantity) return { ok: false, error: `Você possui apenas ${owned}.` }
-
+        const itemDef = ITEM_BY_ID[itemId]
         const totalEarned = entry.price * quantity
-        const newStackable = { ...stackableInventory }
-        const remaining = owned - quantity
-        if (remaining <= 0) delete newStackable[itemId]
-        else newStackable[itemId] = remaining
 
-        set({ hero: { ...hero, gold: hero.gold + totalEarned }, stackableInventory: newStackable })
+        if (itemDef?.stackable !== false) {
+          const owned = stackableInventory[itemId] ?? 0
+          if (owned < quantity) return { ok: false, error: `Você possui apenas ${owned}.` }
+          const newStackable = { ...stackableInventory }
+          const remaining = owned - quantity
+          if (remaining <= 0) delete newStackable[itemId]
+          else newStackable[itemId] = remaining
+          set({ hero: { ...hero, gold: hero.gold + totalEarned }, stackableInventory: newStackable })
+        } else {
+          const owned = inventory.filter(i => i.id === itemId).length
+          if (owned < quantity) return { ok: false, error: `Você possui apenas ${owned}.` }
+          let removed = 0
+          const newInventory = inventory.filter(i => {
+            if (i.id === itemId && removed < quantity) { removed++; return false }
+            return true
+          })
+          set({ hero: { ...hero, gold: hero.gold + totalEarned }, inventory: newInventory })
+        }
         return { ok: true }
+      },
+
+      applyNpcEquipmentSell: (itemId, quantity, newGold) => {
+        const { hero, inventory } = get()
+        if (!hero) return
+        let removed = 0
+        const newInventory = inventory.filter(i => {
+          if (i.id === itemId && removed < quantity) { removed++; return false }
+          return true
+        })
+        set({ hero: { ...hero, gold: newGold }, inventory: newInventory })
       },
 
       spendSkillPoint: (stat) => {

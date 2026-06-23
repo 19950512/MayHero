@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useGameStore } from '../store/gameStore'
+import { ITEM_BY_ID } from '../game/items'
 import { PageHeader } from '../components/PageHeader'
 import {
   CORE_INFO,
@@ -195,7 +196,10 @@ function ForjaPageContent() {
                           className={`w-full text-left bg-[#18120d] rounded-xl px-3 py-2.5 border transition-colors ${isSelected ? 'border-amber-500/60 bg-amber-900/20' : `${RARITY_BORDER[item.rarity]} hover:border-amber-500/30`}`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">{item.icon}</span>
+                            {ITEM_BY_ID[item.id]?.sprite
+                              ? <img src={ITEM_BY_ID[item.id]!.sprite} alt={item.name} className="w-6 h-6 object-contain" />
+                              : <span className="text-xl">{item.icon}</span>
+                            }
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className={`font-bold text-xs ${RARITY_COLORS[item.rarity]}`}>{item.name}</span>
@@ -237,7 +241,10 @@ function ForjaPageContent() {
                             className={`w-full text-left bg-[#18120d] rounded-xl px-3 py-2.5 border transition-colors ${isSelected ? 'border-amber-500/60 bg-amber-900/20' : `${RARITY_BORDER[entry.rarity]} hover:border-amber-500/30`}`}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-xl">{entry.icon}</span>
+                              {ITEM_BY_ID[entry.itemId]?.sprite
+                                ? <img src={ITEM_BY_ID[entry.itemId]!.sprite} alt={entry.name} className="w-6 h-6 object-contain" />
+                                : <span className="text-xl">{entry.icon}</span>
+                              }
                               <div className="flex-1">
                                 <div className="flex items-center justify-between">
                                   <span className={`font-bold text-xs ${RARITY_COLORS[entry.rarity]}`}>{entry.name}</span>
@@ -263,7 +270,10 @@ function ForjaPageContent() {
               {selectedItem ? (
                 <div className={`bg-[#18120d] rounded-xl p-4 border ${RARITY_BORDER[selectedItem.rarity]}`}>
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-4xl">{selectedItem.icon}</span>
+                    {ITEM_BY_ID[selectedItem.id]?.sprite
+                      ? <img src={ITEM_BY_ID[selectedItem.id]!.sprite} alt={selectedItem.name} className="w-12 h-12 object-contain" />
+                      : <span className="text-4xl">{selectedItem.icon}</span>
+                    }
                     <div>
                       <p className={`font-bold text-base ${RARITY_COLORS[selectedItem.rarity]}`}>
                         {getItemDisplayName(selectedItem)}

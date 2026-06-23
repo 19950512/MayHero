@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import { CLASS_ICONS, RARITY_COLORS, DUNGEON_BY_ID } from '../game/data'
+import { ITEM_BY_ID } from '../game/items'
 
 type PublicProfile = {
   name: string
@@ -157,7 +158,12 @@ export function HeroProfileModal({ heroName, onClose, onSendMail }: Props) {
                     : ''
                   return (
                     <div key={slot} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-white/10 bg-black/25">
-                      <span className="text-base w-7 text-center shrink-0">{String(item.icon ?? '⚔️')}</span>
+                      <span className="w-7 h-7 shrink-0 flex items-center justify-center overflow-hidden">
+                        {ITEM_BY_ID[String(item.id ?? '')]?.sprite
+                          ? <img src={ITEM_BY_ID[String(item.id ?? '')]!.sprite} alt={String(item.name ?? '')} className="w-6 h-6 object-contain" />
+                          : <span className="text-base">{String(item.icon ?? '⚔️')}</span>
+                        }
+                      </span>
                       <div className="flex-1 min-w-0">
                         <p className={`text-xs font-bold truncate ${colorClass}`}>
                           {String(item.name ?? '')}{enh}
