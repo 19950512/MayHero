@@ -7,6 +7,7 @@ import { prisma } from './db.js'
 import { redis } from './redis.js'
 import { authRoutes } from './routes/auth.js'
 import { heroRoutes } from './routes/hero.js'
+import { mailRoutes } from './routes/mail.js'
 import { rankingRoutes } from './routes/rankings.js'
 import { shopRoutes } from './routes/shop.js'
 
@@ -113,6 +114,7 @@ app.decorate('authenticate', async (req: any, reply: any) => {
 // Routes
 await app.register(authRoutes)
 await app.register(heroRoutes)
+await app.register(mailRoutes)
 await app.register(rankingRoutes)
 await app.register(shopRoutes)
 

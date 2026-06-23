@@ -38,6 +38,8 @@ model Hero {
   inventory     InventoryItem[]
   listingsAsSeller ShopListing[] @relation("SellerHero")
   purchasesAsBuyer ShopListing[] @relation("BuyerHero")
+  sentMails     Mail[]    @relation("SentMails")
+  receivedMails Mail[]    @relation("ReceivedMails")
 }
 
 model InventoryItem {
@@ -47,6 +49,30 @@ model InventoryItem {
   itemData Json
   listing  ShopListing?
   createdAt DateTime    @default(now())
+}
+
+model Mail {
+  id          String          @id @default(cuid())
+  fromHeroId  String?
+  fromHero    Hero?           @relation("SentMails", fields: [fromHeroId], references: [id], onDelete: SetNull)
+  toHeroId    String
+  toHero      Hero            @relation("ReceivedMails", fields: [toHeroId], references: [id], onDelete: Cascade)
+  subject     String
+  message     String          @default("")
+  gold        Int             @default(0)
+  read        Boolean         @default(false)
+  claimed     Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  attachments MailAttachment[]
+}
+
+model MailAttachment {
+  id        String   @id @default(cuid())
+  mailId    String
+  mail      Mail     @relation(fields: [mailId], references: [id], onDelete: Cascade)
+  itemData  Json
+  claimed   Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model ShopListing {

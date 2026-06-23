@@ -16,7 +16,7 @@ export default function Home() {
   }, [gameStarted, hero, resetGame])
 
   return (
-    <main className="h-screen overflow-hidden">
+    <main className="h-screen overflow-hidden" style={{ height: '100dvh' }}>
       {gameStarted && hero ? <GameUI /> : <CharacterCreation />}
     </main>
   )

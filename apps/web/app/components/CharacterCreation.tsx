@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
@@ -14,8 +14,24 @@ export function CharacterCreation() {
   const [selectedClass, setSelectedClass] = useState<HeroClass>('warrior')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { startGame } = useGameStore()
+  const { startGame, hydrateHeroFromServer } = useGameStore()
   const { user } = useAuthStore()
+
+  // When a logged-in user lands here, check if they already have a server hero
+  // and restore it automatically instead of forcing re-creation.
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    api.hero.get()
+      .then(data => {
+        if (cancelled) return
+        hydrateHeroFromServer(data)
+      })
+      .catch(() => {
+        // 404 means no hero yet — stay on creation screen
+      })
+    return () => { cancelled = true }
+  }, [user, hydrateHeroFromServer])
 
   const handleStart = async () => {
     if (!name.trim()) return

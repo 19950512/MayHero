@@ -26,6 +26,21 @@ interface Notification {
   type: 'xp' | 'gold' | 'levelup' | 'item' | 'defeat' | 'info'
 }
 
+interface ServerHeroPayload {
+  name: string
+  class: string
+  level: number
+  xp: number
+  xpToNext: number
+  gold: number
+  totalKills: number
+  skillPoints: number
+  currentZone: number
+  statsJson: Record<string, unknown>
+  baseStatsJson: Record<string, unknown>
+  equipJson: Record<string, unknown>
+}
+
 interface GameState {
   hero: Hero | null
   heroMessage: string
@@ -41,6 +56,7 @@ interface GameState {
   killsInZone: number
 
   // Actions
+  hydrateHeroFromServer: (data: ServerHeroPayload) => void
   startGame: (name: string, heroClass: Hero['class']) => void
   tick: () => void
   toggleAutoFight: () => void
@@ -111,6 +127,53 @@ export const useGameStore = create<GameState>()(
       battleEncounterId: null,
       gameStarted: false,
       killsInZone: 0,
+
+      hydrateHeroFromServer: (data) => {
+        const DUNGEON_IDS_BY_ZONE: Record<number, string> = {
+          1: 'floresta_santa_rita',
+          2: 'cavernas_sombrias',
+          3: 'planicie_esquecida',
+          4: 'torre_magica',
+          5: 'abismo_eterno',
+        }
+        const dungeonId = DUNGEON_IDS_BY_ZONE[data.currentZone] ?? 'floresta_santa_rita'
+        const stats = data.statsJson as unknown as Hero['stats']
+        const baseStats = data.baseStatsJson as unknown as Hero['baseStats']
+        const equipRaw = data.equipJson as Record<string, unknown>
+        const equipment: Hero['equipment'] = {
+          weapon: equipRaw.weapon as Hero['equipment']['weapon'],
+          armor: equipRaw.armor as Hero['equipment']['armor'],
+          helm: equipRaw.helm as Hero['equipment']['helm'],
+          ring: equipRaw.ring as Hero['equipment']['ring'],
+        }
+        const EMPTY_LOADOUT = {
+          accessories: { amulet: undefined, ring1: undefined, ring2: undefined, ring3: undefined, ring4: undefined, cornalina1: undefined, cornalina2: undefined, talisma1: undefined, talisma2: undefined, belt: undefined, earring1: undefined, earring2: undefined },
+          equipment: { head: undefined, body: undefined, legs: undefined, boots: undefined, offhand: undefined, mainhand: undefined },
+          pets: { pet1: undefined, pet2: undefined },
+        }
+        set({
+          hero: {
+            name: data.name,
+            class: data.class as Hero['class'],
+            level: data.level,
+            xp: data.xp,
+            xpToNext: data.xpToNext,
+            gold: data.gold,
+            totalKills: data.totalKills,
+            skillPoints: data.skillPoints,
+            stats,
+            baseStats,
+            equipment,
+            loadout: EMPTY_LOADOUT,
+            skillAllocations: { atk: 0, def: 0, maxHp: 0, spd: 0 },
+          },
+          gameStarted: true,
+          currentDungeon: dungeonId,
+          battle: IDLE_BATTLE_STATE,
+          notifications: [],
+          battleEncounterId: null,
+        })
+      },
 
       startGame: (name, heroClass) => {
         const hero = createHero(name, heroClass)

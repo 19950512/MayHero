@@ -13,6 +13,31 @@ type StatsPayload = {
   crit: number
 }
 
+export type MailAttachment = {
+  id: string
+  itemData: Record<string, unknown>
+  claimed: boolean
+}
+
+export type MailMessage = {
+  id: string
+  fromHero: { name: string } | null
+  subject: string
+  message: string
+  gold: number
+  read: boolean
+  claimed: boolean
+  createdAt: string
+  attachments: MailAttachment[]
+}
+
+export type HeroSearchResult = {
+  id: string
+  name: string
+  class: string
+  level: number
+}
+
 function getLegacyToken(): string | null {
   if (typeof window === 'undefined') return null
   return localStorage.getItem('mayhero_token')
@@ -50,7 +75,11 @@ export const api = {
   },
 
   hero: {
-    get: () => req<Record<string, unknown>>('GET', '/hero'),
+    get: () => req<{
+      name: string; class: string; level: number; xp: number; xpToNext: number
+      gold: number; totalKills: number; skillPoints: number; currentZone: number
+      statsJson: Record<string, unknown>; baseStatsJson: Record<string, unknown>; equipJson: Record<string, unknown>
+    }>('GET', '/hero'),
     inventory: () => req<Array<{ id: string; itemData: Record<string, unknown> }>>('GET', '/hero/inventory'),
     create: (data: { name: string; class: string; stats: unknown; baseStats: unknown }) =>
       req<Record<string, unknown>>('POST', '/hero', data),
@@ -89,11 +118,27 @@ export const api = {
         }
       }>('POST', '/hero/battle/victory', data),
     rename: (name: string) => req<{ ok: boolean; name: string }>('PATCH', '/hero/rename', { name }),
+    search: (q: string) => req<HeroSearchResult[]>('GET', `/hero/search?q=${encodeURIComponent(q)}`),
   },
 
   rankings: {
     byLevel: () => req<{ rankings: unknown[] }>('GET', '/rankings'),
     byKills: () => req<{ rankings: unknown[] }>('GET', '/rankings/kills'),
+  },
+
+  mail: {
+    inbox: () => req<MailMessage[]>('GET', '/mail'),
+    unreadCount: () => req<{ count: number }>('GET', '/mail/unread-count'),
+    markRead: (id: string) => req<{ ok: boolean }>('PATCH', `/mail/${id}/read`),
+    claim: (id: string) => req<{ ok: boolean; goldClaimed: number; itemsClaimed: number }>('POST', `/mail/${id}/claim`),
+    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/mail/${id}`),
+    send: (data: {
+      targetHeroName: string
+      subject: string
+      message?: string
+      gold?: number
+      inventoryItemIds?: string[]
+    }) => req<{ ok: boolean }>('POST', '/mail/send', data),
   },
 
   shop: {

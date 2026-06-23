@@ -11,35 +11,42 @@ import { HeroStats } from './HeroStats'
 import { Inventory } from './Inventory'
 import { ZoneSelector } from './ZoneSelector'
 import { Profile } from './Profile'
+import { Mailbox } from './Mailbox'
+import { MenuScreen } from './MenuScreen'
+import { ComposeMailModal } from './ComposeMailModal'
 import type { Equipment } from '../game/types'
 
-type Tab = 'battle' | 'stats' | 'inventory' | 'zones' | 'profile'
+export type Tab = 'battle' | 'stats' | 'inventory' | 'zones' | 'profile' | 'mail' | 'menu'
 
-const TABS: { id: Tab; label: string; sigil: string }[] = [
-  { id: 'battle',  label: 'Confronto', sigil: 'I'   },
-  { id: 'stats',   label: 'Herói',     sigil: 'II'  },
-  { id: 'inventory', label: 'Arsenal', sigil: 'III' },
-  { id: 'zones',   label: 'Reinos',    sigil: 'IV'  },
-  { id: 'profile', label: 'Perfil',    sigil: 'V'   },
+// Only these 4 appear in the tab bar; the rest are navigated from Menu
+const NAV_TABS: { id: Tab; label: string; sigil: string }[] = [
+  { id: 'battle',    label: 'Confronto', sigil: 'I'   },
+  { id: 'stats',     label: 'Herói',     sigil: 'II'  },
+  { id: 'inventory', label: 'Arsenal',   sigil: 'III' },
+  { id: 'menu',      label: 'Menu',      sigil: '☰'   },
 ]
+
+// Tab bar highlight: these tabs all map to the "Menu" nav item
+const MENU_TABS = new Set<Tab>(['menu', 'zones', 'profile', 'mail'])
 
 const SYNC_INTERVAL_MS = 30_000
 
-// Module-level flag — survives component remounts (e.g. navigating /forja → /)
-// but resets on full page reload. Prevents re-hydrating on remount and wiping local enhancements.
+// Module-level flag — survives component remounts but resets on full page reload.
 let sessionInventoryHydrated = false
 
 export function GameUI() {
   const [activeTab, setActiveTab] = useState<Tab>('battle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
   const [showNotifications, setShowNotifications] = useState(true)
+  const [unreadMail, setUnreadMail] = useState(0)
+  const [composeItem, setComposeItem] = useState<Equipment | undefined>(undefined)
+  const [composeOpen, setComposeOpen] = useState(false)
   const {
     hero,
     battle,
     tick,
     notifications,
     dismissNotification,
-    resetGame,
     inventory,
     stackableInventory,
     currentDungeon,
@@ -53,6 +60,7 @@ export function GameUI() {
   const currentZoneId = DUNGEON_BY_ID[currentDungeon]?.zoneId ?? 1
   const { user, logout } = useAuthStore()
   const lastSyncRef = useRef<number>(0)
+  const lastMailCheckRef = useRef<number>(0)
   const lastVictoryKeyRef = useRef<string | null>(null)
   const battleStartPendingRef = useRef(false)
 
@@ -71,7 +79,6 @@ export function GameUI() {
     ) {
       return null
     }
-
     if (!['weapon', 'armor', 'helm', 'ring'].includes(raw.slot)) return null
     if (!['common', 'rare', 'epic', 'legendary'].includes(raw.rarity)) return null
 
@@ -79,7 +86,6 @@ export function GameUI() {
     for (const val of Object.values(bonuses)) {
       if (typeof val !== 'number' || !Number.isFinite(val)) return null
     }
-
     return {
       id: raw.id,
       name: raw.name,
@@ -105,13 +111,9 @@ export function GameUI() {
     if (!user) sessionInventoryHydrated = false
   }, [user, setServerAuthoritativeRewards])
 
-  // Hydrate local inventory from API once per session lifecycle.
-  // Uses a module-level flag so navigating away and back doesn't re-run this
-  // and overwrite locally-enhanced items with stale server data.
   useEffect(() => {
     if (!user || !hero) return
     if (sessionInventoryHydrated) return
-
     api.hero.inventory()
       .then(dbItems => {
         const items = dbItems
@@ -120,30 +122,21 @@ export function GameUI() {
         replaceInventory(items)
         sessionInventoryHydrated = true
       })
-      .catch(() => {
-        // Ignore transient failures; local inventory remains available.
-      })
+      .catch(() => undefined)
   }, [user, hero, replaceInventory])
 
   useEffect(() => {
-    // On refresh, persisted user may be stale; validate session with backend.
     api.auth.me().then((me) => {
-      if (!me && user) {
-        logout().catch(() => undefined)
-      }
-    }).catch(() => {
-      // Ignore startup connectivity hiccups.
-    })
+      if (!me && user) logout().catch(() => undefined)
+    }).catch(() => undefined)
   }, [user, logout])
 
-  // Auto-dismiss notifications
   useEffect(() => {
     if (notifications.length === 0) return
     const t = setTimeout(() => dismissNotification(notifications[0].id), 3000)
     return () => clearTimeout(t)
   }, [notifications, dismissNotification])
 
-  // Server-authoritative rewards for online battles.
   useEffect(() => {
     if (!user || !hero) return
     if (battle.phase !== 'victory' || !battle.enemy) return
@@ -160,16 +153,8 @@ export function GameUI() {
       heroHpAfterBattle: hero.stats.hp,
     }).then(result => {
       applyServerVictoryResolution({
-        hero: {
-          ...result.hero,
-          stats: result.hero.stats,
-          baseStats: result.hero.baseStats,
-        },
-        rewards: {
-          ...result.rewards,
-          itemDrop: result.rewards.itemDrop,
-          stackableDrops: result.rewards.stackableDrops,
-        },
+        hero: { ...result.hero, stats: result.hero.stats, baseStats: result.hero.baseStats },
+        rewards: { ...result.rewards, itemDrop: result.rewards.itemDrop, stackableDrops: result.rewards.stackableDrops },
         serverState: result.serverState,
       })
     }).catch((e: unknown) => {
@@ -182,7 +167,6 @@ export function GameUI() {
     })
   }, [user, hero, battle.phase, battle.turn, battle.enemy, battleEncounterId, currentZoneId, killsInZone, applyServerVictoryResolution, setServerAuthoritativeRewards])
 
-  // In online mode, each fight must start from a server-issued encounter.
   useEffect(() => {
     if (!user || !hero) return
     if (battle.phase !== 'idle') return
@@ -191,42 +175,27 @@ export function GameUI() {
 
     battleStartPendingRef.current = true
     api.hero.battleStart({ currentZone: currentZoneId })
-      .then(({ encounterId, enemyId }) => {
-        startServerEncounter({ encounterId, enemyId })
-      })
+      .then(({ encounterId, enemyId }) => { startServerEncounter({ encounterId, enemyId }) })
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : ''
         if (msg.toLowerCase().includes('não autorizado') || msg.toLowerCase().includes('unauthorized')) {
           setServerAuthoritativeRewards(false)
         }
       })
-      .finally(() => {
-        battleStartPendingRef.current = false
-      })
+      .finally(() => { battleStartPendingRef.current = false })
   }, [user, hero, battle.phase, battleEncounterId, currentZoneId, startServerEncounter, setServerAuthoritativeRewards])
 
-  // Auto-sync to API
   useEffect(() => {
     if (!hero || !user) return
     const now = Date.now()
     if (now - lastSyncRef.current < SYNC_INTERVAL_MS) return
 
     const syncData = {
-      name: hero.name,
-      class: hero.class,
-      level: hero.level,
-      xp: hero.xp,
-      xpToNext: hero.xpToNext,
-      gold: hero.gold,
-      totalKills: hero.totalKills,
-      skillPoints: hero.skillPoints,
-      currentZone: currentZoneId,
-      stats: hero.stats,
-      baseStats: hero.baseStats,
-      equipment: hero.equipment,
-      loadout: hero.loadout,
-      inventory,
-      stackableInventory,
+      name: hero.name, class: hero.class, level: hero.level, xp: hero.xp,
+      xpToNext: hero.xpToNext, gold: hero.gold, totalKills: hero.totalKills,
+      skillPoints: hero.skillPoints, currentZone: currentZoneId,
+      stats: hero.stats, baseStats: hero.baseStats,
+      equipment: hero.equipment, loadout: hero.loadout, inventory, stackableInventory,
     }
 
     setSyncStatus('syncing')
@@ -237,14 +206,9 @@ export function GameUI() {
         .then(() => setSyncStatus('ok'))
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : ''
-          // Herói não existe na API ainda — cria primeiro, depois sincroniza
           if (msg.includes('não encontrado')) {
-            api.hero.create({
-              name: hero.name,
-              class: hero.class,
-              stats: hero.stats,
-              baseStats: hero.baseStats,
-            }).then(doSync).catch(() => setSyncStatus('error'))
+            api.hero.create({ name: hero.name, class: hero.class, stats: hero.stats, baseStats: hero.baseStats })
+              .then(doSync).catch(() => setSyncStatus('error'))
           } else {
             setSyncStatus('error')
           }
@@ -254,25 +218,43 @@ export function GameUI() {
     doSync()
   }, [hero, user, inventory, stackableInventory, currentZoneId])
 
+  // Poll for unread mail
+  useEffect(() => {
+    if (!user) return
+    const check = () => {
+      const now = Date.now()
+      if (now - lastMailCheckRef.current < 120_000) return
+      lastMailCheckRef.current = now
+      api.mail.unreadCount().then(({ count }) => setUnreadMail(count)).catch(() => undefined)
+    }
+    check()
+    const interval = setInterval(check, 30_000)
+    return () => clearInterval(interval)
+  }, [user])
+
+  useEffect(() => {
+    if (activeTab === 'mail') setUnreadMail(0)
+  }, [activeTab])
+
   const electronApi = typeof window !== 'undefined'
     ? (window as Window & { electronAPI?: { isElectron?: boolean; closeWindow?: () => void } }).electronAPI
     : undefined
   const isElectron = !!electronApi?.isElectron
-  const handleClose = () => {
-    if (isElectron) electronApi?.closeWindow?.()
-  }
 
   if (!hero) return null
 
+  const isMenuActive = MENU_TABS.has(activeTab)
+
   return (
-    <div className="flex flex-col h-screen bg-[radial-gradient(circle_at_top,#3a2b17_0%,#1b140d_30%,#100d08_70%,#0a0907_100%)] text-[var(--parchment)] select-none overflow-hidden">
+    <div
+      className="flex flex-col h-screen bg-[radial-gradient(circle_at_top,#3a2b17_0%,#1b140d_30%,#100d08_70%,#0a0907_100%)] text-[var(--parchment)] select-none overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
       {/* Title bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-[#1a140f]/90 border-b border-amber-900/40 drag-region shrink-0">
-        <div className="flex items-center gap-2 hidden sm:flex">
+        <div className="hidden sm:flex items-center gap-2">
           <span className="text-amber-200 text-xs font-semibold tracking-[0.2em]">MAY HERO</span>
-          {user && (
-            <span className="text-amber-100/40 text-xs">@{user.username}</span>
-          )}
+          {user && <span className="text-amber-100/40 text-xs">@{user.username}</span>}
         </div>
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1">
@@ -291,7 +273,6 @@ export function GameUI() {
           </div>
         </div>
         <div className="flex items-center gap-2 no-drag">
-          {/* Sync indicator */}
           {user && (
             <span className={`text-xs ${syncStatus === 'syncing' ? 'text-amber-300' : syncStatus === 'ok' ? 'text-emerald-300' : syncStatus === 'error' ? 'text-red-300' : 'text-amber-100/30'}`}>
               {syncStatus === 'syncing' ? 'Sinc...' : syncStatus === 'ok' ? 'Sinc OK' : syncStatus === 'error' ? 'Sinc ERR' : 'Sinc'}
@@ -301,7 +282,6 @@ export function GameUI() {
             onClick={() => setShowNotifications(v => !v)}
             className="relative w-6 h-6 rounded-md bg-amber-100/10 hover:bg-amber-100/20 flex items-center justify-center text-amber-100/70 hover:text-amber-50 text-xs transition-colors"
             title={showNotifications ? 'Ocultar notificações' : 'Mostrar notificações'}
-            aria-label={showNotifications ? 'Ocultar notificações' : 'Mostrar notificações'}
           >
             {showNotifications ? '◉' : '○'}
             {!showNotifications && notifications.length > 0 && (
@@ -311,15 +291,11 @@ export function GameUI() {
             )}
           </button>
           <span className="text-amber-300 text-xs font-bold">Ouro {hero.gold}</span>
-          {!user && (
-            <Link href="/login" className="text-amber-200 text-xs hover:text-amber-100">Entrar</Link>
-          )}
-          {user && (
-            <button onClick={logout} className="text-amber-100/40 text-xs hover:text-amber-100/70">Sair</button>
-          )}
+          {!user && <Link href="/login" className="text-amber-200 text-xs hover:text-amber-100">Entrar</Link>}
+          {user && <button onClick={logout} className="text-amber-100/40 text-xs hover:text-amber-100/70">Sair</button>}
           {isElectron && (
             <button
-              onClick={handleClose}
+              onClick={() => electronApi?.closeWindow?.()}
               className="w-5 h-5 rounded-full bg-amber-100/10 hover:bg-red-700/70 flex items-center justify-center text-amber-100/50 hover:text-amber-50 text-xs transition-colors"
             >
               ×
@@ -334,15 +310,14 @@ export function GameUI() {
           {notifications.map(n => (
             <div
               key={n.id}
-              className={`
-                text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg
-                ${n.type === 'xp' ? 'bg-blue-900/80 text-blue-100 border border-blue-300/20' :
-                  n.type === 'gold' ? 'bg-amber-900/80 text-amber-100 border border-amber-300/20' :
-                  n.type === 'levelup' ? 'bg-emerald-900/80 text-emerald-100 border border-emerald-300/20' :
-                  n.type === 'item' ? 'bg-stone-800/90 text-stone-100 border border-stone-300/20' :
-                  n.type === 'defeat' ? 'bg-red-900/85 text-red-100 border border-red-300/20' :
-                  'bg-stone-700/90 text-stone-50'}
-              `}
+              className={`text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-lg ${
+                n.type === 'xp'      ? 'bg-blue-900/80 text-blue-100 border border-blue-300/20' :
+                n.type === 'gold'    ? 'bg-amber-900/80 text-amber-100 border border-amber-300/20' :
+                n.type === 'levelup' ? 'bg-emerald-900/80 text-emerald-100 border border-emerald-300/20' :
+                n.type === 'item'    ? 'bg-stone-800/90 text-stone-100 border border-stone-300/20' :
+                n.type === 'defeat'  ? 'bg-red-900/85 text-red-100 border border-red-300/20' :
+                'bg-stone-700/90 text-stone-50'
+              }`}
             >
               {n.message}
             </div>
@@ -355,53 +330,51 @@ export function GameUI() {
         <div className="h-full">
           {activeTab === 'battle'    && <BattleScreen />}
           {activeTab === 'stats'     && <HeroStats />}
-          {activeTab === 'inventory' && <Inventory />}
+          {activeTab === 'inventory' && (
+            <Inventory onComposeMail={(item) => { setComposeItem(item); setComposeOpen(true) }} />
+          )}
           {activeTab === 'profile'   && <Profile />}
-          {activeTab === 'zones' && (
+          {activeTab === 'mail'      && <Mailbox />}
+          {activeTab === 'menu'      && <MenuScreen onNavigate={setActiveTab} />}
+          {activeTab === 'zones'     && (
             <div className="flex flex-col gap-4 h-full overflow-y-auto">
               <ZoneSelector />
-              <div className="flex flex-col gap-2 border-t border-white/5 pt-3">
-                <Link href="/rankings" className="text-center py-2 rounded-lg text-xs text-amber-200/70 hover:text-amber-200 hover:bg-amber-900/20 transition-colors">
-                  Ver Tabela de Heróis
-                </Link>
-                <Link href="/shop" className="text-center py-2 rounded-lg text-xs text-amber-300/70 hover:text-amber-300 hover:bg-amber-950/30 transition-colors">
-                  Mercado de Itens
-                </Link>
-                <Link href="/loja" className="text-center py-2 rounded-lg text-xs text-amber-300/70 hover:text-amber-300 hover:bg-amber-950/30 transition-colors">
-                  ⚒️ Loja do Ferreiro
-                </Link>
-                <Link href="/forja" className="text-center py-2 rounded-lg text-xs text-amber-400/70 hover:text-amber-400 hover:bg-amber-950/30 transition-colors">
-                  🔨 Forja de Aprimoramento
-                </Link>
-                <button
-                  onClick={() => {
-                    if (confirm('Tem certeza? O progresso local será perdido!')) resetGame()
-                  }}
-                  className="py-2 rounded-lg text-xs text-red-400/60 hover:text-red-400 hover:bg-red-900/20 transition-colors"
-                >
-                  Resetar Jogo
-                </button>
-              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Tab bar */}
+      {/* Compose mail modal (opened from Inventory "✉️ Enviar") */}
+      {composeOpen && (
+        <ComposeMailModal
+          preAttached={composeItem}
+          onClose={() => { setComposeOpen(false); setComposeItem(undefined) }}
+          onSent={() => { setComposeOpen(false); setComposeItem(undefined) }}
+        />
+      )}
+
+      {/* Tab bar — 4 items only */}
       <div className="shrink-0 flex border-t border-amber-900/40 bg-[#1a140f]/85">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`
-              flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors
-              ${activeTab === tab.id ? 'text-amber-100' : 'text-amber-100/40 hover:text-amber-100/70'}
-            `}
-          >
-            <span className="text-[10px] leading-none tracking-widest">{tab.sigil}</span>
-            <span className="text-[10px] font-semibold uppercase tracking-wide">{tab.label}</span>
-          </button>
-        ))}
+        {NAV_TABS.map(tab => {
+          const isActive = tab.id === 'menu' ? isMenuActive : activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id === 'menu' && isMenuActive ? activeTab : tab.id)}
+              className={`flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors relative ${
+                isActive ? 'text-amber-100' : 'text-amber-100/40 hover:text-amber-100/70'
+              }`}
+            >
+              <span className="text-[10px] leading-none tracking-widest">{tab.sigil}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide">{tab.label}</span>
+              {tab.id === 'menu' && unreadMail > 0 && (
+                <span className="absolute top-1 right-1/4 min-w-3.5 h-3.5 px-0.5 rounded-full bg-amber-500 text-[9px] font-bold text-amber-950 flex items-center justify-center">
+                  {Math.min(unreadMail, 9)}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
