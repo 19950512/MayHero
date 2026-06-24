@@ -167,6 +167,9 @@ export const useGameStore = create<GameState>()(
           pets: { pet1: undefined, pet2: undefined },
         }
 
+        const { battle: currentBattle, battleEncounterId: currentEncounterId, hero: currentHero } = get()
+        const fightingNow = currentBattle.phase === 'fighting'
+
         const nextState: Partial<GameState> = {
           hero: {
             name: data.name,
@@ -177,7 +180,10 @@ export const useGameStore = create<GameState>()(
             gold: data.gold,
             totalKills: data.totalKills,
             skillPoints: data.skillPoints,
-            stats,
+            // Preserve local HP during an active fight to avoid jarring jumps
+            stats: fightingNow && currentHero
+              ? { ...stats, hp: Math.min(currentHero.stats.hp, stats.maxHp) }
+              : stats,
             baseStats,
             equipment,
             loadout: EMPTY_LOADOUT,
@@ -185,9 +191,12 @@ export const useGameStore = create<GameState>()(
           },
           gameStarted: true,
           currentDungeon: dungeonId,
-          battle: IDLE_BATTLE_STATE,
           notifications: [],
-          battleEncounterId: null,
+          // Preserve ongoing battle so navigation/mail-claims don't interrupt the fight
+          ...(fightingNow
+            ? { battle: currentBattle, battleEncounterId: currentEncounterId }
+            : { battle: IDLE_BATTLE_STATE, battleEncounterId: null }
+          ),
         }
 
         if (data.inventory) {
@@ -628,7 +637,10 @@ export const useGameStore = create<GameState>()(
       },
 
       setServerAuthoritativeRewards: (enabled) => {
-        set({ serverAuthoritativeRewards: enabled, battleEncounterId: null })
+        // Only clear battleEncounterId on logout (enabled=false).
+        // On login/remount (enabled=true) we preserve it so an in-flight
+        // victory can still resolve and the battle isn't stuck.
+        set({ serverAuthoritativeRewards: enabled, ...(!enabled ? { battleEncounterId: null } : {}) })
       },
 
       startServerEncounter: ({ encounterId, enemyId }) => {

@@ -8,6 +8,30 @@ import { ITEM_BY_ID } from '../../game/items'
 import { useGameStore } from '../../store/gameStore'
 import { api } from '../../lib/api'
 import { PageHeader } from '../../components/PageHeader'
+import type { Equipment } from '../../game/types'
+
+function parseDbEquipment(db: { id: string; itemData: Record<string, unknown>; listing?: { soldAt: string | null } | null }): Equipment | null {
+  const raw = db.itemData
+  if (
+    typeof raw.id !== 'string' || typeof raw.name !== 'string' ||
+    typeof raw.slot !== 'string' || typeof raw.rarity !== 'string' ||
+    typeof raw.icon !== 'string' || typeof raw.requiredLevel !== 'number' ||
+    !raw.bonuses || typeof raw.bonuses !== 'object'
+  ) return null
+  if (!['weapon', 'armor', 'helm', 'ring'].includes(raw.slot as string)) return null
+  if (db.listing && db.listing.soldAt === null) return null
+  return {
+    id: raw.id,
+    inventoryItemId: db.id,
+    name: raw.name,
+    slot: raw.slot as Equipment['slot'],
+    rarity: raw.rarity as Equipment['rarity'],
+    bonuses: raw.bonuses as Equipment['bonuses'],
+    icon: raw.icon,
+    requiredLevel: raw.requiredLevel,
+    enhancement: typeof raw.enhancement === 'number' ? raw.enhancement : undefined,
+  }
+}
 
 const RARITY_COLORS: Record<string, string> = {
   common:    'text-stone-300',
@@ -35,10 +59,11 @@ export default function NpcPageClient({ id }: { id: string }) {
   const npc = NPC_BY_ID[id]
   if (!npc) notFound()
 
-  const { hero, inventory, stackableInventory, npcPurchased, buyFromNpc, sellToNpc, applyNpcEquipmentSell } = useGameStore()
+  const { hero, inventory, stackableInventory, npcPurchased, buyFromNpc, sellToNpc, applyNpcEquipmentSell, replaceInventory } = useGameStore()
 
   const [tab, setTab] = useState<'comprar' | 'vender'>('comprar')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const phrase = useMemo(
@@ -54,33 +79,66 @@ export default function NpcPageClient({ id }: { id: string }) {
 
   const handleConfirm = async () => {
     if (!confirm) return
+
     if (confirm.mode === 'buy') {
       const result = buyFromNpc(npc.id, confirm.itemId, confirm.qty)
-      flash(result.ok ? `Comprado com sucesso!` : (result.error ?? 'Erro.'), result.ok)
-    } else {
-      const itemDef = ITEM_BY_ID[confirm.itemId]
-      if (itemDef?.stackable === false) {
-        try {
-          const itemsToSell = inventory
-            .filter(i => i.id === confirm.itemId && i.inventoryItemId)
-            .slice(0, confirm.qty)
-          if (itemsToSell.length < confirm.qty) {
-            flash('Itens sem rastreamento de ID — recarregue o jogo e tente novamente.', false)
-            return
-          }
-          const inventoryItemIds = itemsToSell.map(i => i.inventoryItemId!)
-          const result = await api.hero.npcSell({ npcId: npc.id, inventoryItemIds })
-          applyNpcEquipmentSell(inventoryItemIds, result.newGold)
-          flash('Vendido com sucesso!', true)
-        } catch (e) {
-          flash(e instanceof Error ? e.message : 'Erro ao vender.', false)
-        }
-      } else {
-        const result = sellToNpc(npc.id, confirm.itemId, confirm.qty)
-        flash(result.ok ? `Vendido com sucesso!` : (result.error ?? 'Erro.'), result.ok)
-      }
+      setConfirm(null)
+      flash(result.ok ? 'Comprado com sucesso!' : (result.error ?? 'Erro.'), result.ok)
+      return
     }
-    setConfirm(null)
+
+    const itemDef = ITEM_BY_ID[confirm.itemId]
+    if (itemDef?.stackable !== false) {
+      const result = sellToNpc(npc.id, confirm.itemId, confirm.qty)
+      setConfirm(null)
+      flash(result.ok ? 'Vendido com sucesso!' : (result.error ?? 'Erro.'), result.ok)
+      return
+    }
+
+    // Non-stackable equipment sell — needs server inventoryItemId
+    setConfirming(true)
+    try {
+      let sellSource = inventory
+      let itemsToSell = sellSource.filter(i => i.id === confirm.itemId && i.inventoryItemId).slice(0, confirm.qty)
+
+      if (itemsToSell.length < confirm.qty) {
+        // Auto-sync inventory from server to obtain IDs (items dropped mid-session lack them)
+        const dbItems = await api.hero.inventory()
+        const equippedDbIds = new Set<string>()
+        if (hero) {
+          for (const slot of ['weapon', 'armor', 'helm', 'ring'] as const) {
+            const eq = hero.equipment[slot]
+            if (eq?.inventoryItemId) equippedDbIds.add(eq.inventoryItemId)
+          }
+        }
+        const synced: Equipment[] = []
+        for (const db of dbItems) {
+          if (equippedDbIds.has(db.id)) continue
+          const eq = parseDbEquipment(db)
+          if (eq) synced.push(eq)
+        }
+        replaceInventory(synced)
+        sellSource = synced
+        itemsToSell = sellSource.filter(i => i.id === confirm.itemId && i.inventoryItemId).slice(0, confirm.qty)
+      }
+
+      if (itemsToSell.length < confirm.qty) {
+        setConfirm(null)
+        flash('Itens não encontrados no servidor. Tente novamente.', false)
+        return
+      }
+
+      const inventoryItemIds = itemsToSell.map(i => i.inventoryItemId!)
+      const result = await api.hero.npcSell({ npcId: npc.id, inventoryItemIds })
+      applyNpcEquipmentSell(inventoryItemIds, result.newGold)
+      setConfirm(null)
+      flash('Vendido com sucesso!', true)
+    } catch (e) {
+      setConfirm(null)
+      flash(e instanceof Error ? e.message : 'Erro ao vender.', false)
+    } finally {
+      setConfirming(false)
+    }
   }
 
   return (
@@ -181,9 +239,10 @@ export default function NpcPageClient({ id }: { id: string }) {
           npcPurchased={npcPurchased}
           npcSells={npc.sells}
           npcBuys={npc.buys}
+          loading={confirming}
           onChangeQty={(qty) => setConfirm(c => c ? { ...c, qty } : c)}
           onConfirm={handleConfirm}
-          onCancel={() => setConfirm(null)}
+          onCancel={() => !confirming && setConfirm(null)}
         />
       )}
     </div>
@@ -329,6 +388,7 @@ function ConfirmModal({
   npcPurchased,
   npcSells,
   npcBuys,
+  loading,
   onChangeQty,
   onConfirm,
   onCancel,
@@ -343,6 +403,7 @@ function ConfirmModal({
   npcPurchased: Record<string, Record<string, number>>
   npcSells: NpcSellEntry[]
   npcBuys: NpcBuyEntry[]
+  loading: boolean
   onChangeQty: (qty: number) => void
   onConfirm: () => void
   onCancel: () => void
@@ -433,16 +494,17 @@ function ConfirmModal({
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#18120d] border border-amber-900/30 text-amber-100/60 hover:text-amber-100 transition-colors"
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#18120d] border border-amber-900/30 text-amber-100/60 hover:text-amber-100 disabled:opacity-40 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirm}
-            disabled={!canProceed}
+            disabled={!canProceed || loading}
             className={`flex-1 py-2.5 rounded-xl text-sm font-bold disabled:opacity-40 transition-colors ${isBuy ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' : 'bg-emerald-800 hover:bg-emerald-700 text-emerald-50'}`}
           >
-            Confirmar
+            {loading ? 'Aguarde...' : 'Confirmar'}
           </button>
         </div>
       </div>

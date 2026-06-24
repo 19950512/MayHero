@@ -5,9 +5,11 @@ import { api } from '../lib/api'
 import type { MailMessage } from '../lib/api'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
-import { RARITY_COLORS } from '../game/data'
+import { RARITY_COLORS, ITEM_BY_ID } from '../game/data'
 import { ComposeMailModal } from './ComposeMailModal'
 import { HeroProfileModal } from './HeroProfileModal'
+import { ItemDetailModal } from './ItemDetailModal'
+import type { Equipment } from '../game/types'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -31,6 +33,25 @@ export function Mailbox() {
   const [composeOpen, setComposeOpen] = useState(false)
   const [composePreRecipient, setComposePreRecipient] = useState<{ name: string; class: string; level: number } | undefined>(undefined)
   const [viewingHero, setViewingHero] = useState<string | null>(null)
+  const [detailItem, setDetailItem] = useState<Equipment | null>(null)
+
+  const toEquipment = (data: Record<string, unknown>): Equipment | null => {
+    if (!data.id || typeof data.id !== 'string') return null
+    const slot = data.slot as string
+    const rarity = data.rarity as string
+    if (!['weapon', 'armor', 'helm', 'ring'].includes(slot)) return null
+    if (!['common', 'rare', 'epic', 'legendary'].includes(rarity)) return null
+    return {
+      id: data.id,
+      name: (data.name as string) ?? '',
+      slot: slot as Equipment['slot'],
+      rarity: rarity as Equipment['rarity'],
+      bonuses: (data.bonuses as Equipment['bonuses']) ?? {},
+      icon: (data.icon as string) ?? '⚔️',
+      requiredLevel: (data.requiredLevel as number) ?? 1,
+      enhancement: data.enhancement as number | undefined,
+    }
+  }
 
   const loadMails = useCallback(async () => {
     if (!user) return
@@ -107,6 +128,12 @@ export function Mailbox() {
 
   return (
     <div className="flex flex-col gap-3 h-full overflow-y-auto">
+      {detailItem && (
+        <ItemDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+        />
+      )}
       {composeOpen && (
         <ComposeMailModal
           preRecipient={composePreRecipient}
@@ -227,6 +254,8 @@ export function Mailbox() {
                         const d = att.itemData as Record<string, unknown>
                         const rarity = (d.rarity as string) ?? 'common'
                         const colorClass = RARITY_COLORS[rarity as keyof typeof RARITY_COLORS] ?? 'text-white/70'
+                        const sprite = ITEM_BY_ID[(d.id as string) ?? '']?.sprite
+                        const eq = toEquipment(d)
                         return (
                           <div
                             key={att.id}
@@ -234,7 +263,17 @@ export function Mailbox() {
                               att.claimed ? 'border-white/5 opacity-50' : 'border-white/15'
                             }`}
                           >
-                            <span className="text-base">{(d.icon as string) ?? '⚔️'}</span>
+                            <button
+                              onClick={() => eq && setDetailItem(eq)}
+                              disabled={!eq}
+                              className="shrink-0 w-10 h-10 rounded-md bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden hover:border-amber-500/40 disabled:cursor-default transition-colors"
+                              title={eq ? 'Ver detalhes' : undefined}
+                            >
+                              {sprite
+                                ? <img src={sprite} alt={(d.name as string) ?? 'Item'} className="w-full h-full object-contain p-0.5" />
+                                : <span className="text-xl">{(d.icon as string) ?? '⚔️'}</span>
+                              }
+                            </button>
                             <div className="flex-1 min-w-0">
                               <p className={`text-xs font-bold ${colorClass}`}>{(d.name as string) ?? 'Item'}</p>
                               <p className="text-white/30 text-[10px] capitalize">{(d.slot as string) ?? ''}</p>

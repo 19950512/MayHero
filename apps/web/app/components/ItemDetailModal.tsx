@@ -42,10 +42,11 @@ interface ItemDetailModalProps {
   onForge?: () => void
   onSell?: () => void
   onSend?: () => void
+  sendLabel?: string
   sellPanel?: React.ReactNode
 }
 
-export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, onForge, onSell, onSend, sellPanel }: ItemDetailModalProps) {
+export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, onForge, onSell, onSend, sendLabel, sellPanel }: ItemDetailModalProps) {
   const enhancement = item.enhancement ?? 0
   const bonusEntries = Object.entries(item.bonuses ?? {})
 
@@ -187,7 +188,7 @@ export function ItemDetailModal({ item, onClose, onEquip, canEquip, onUnequip, o
                   onClick={onSend}
                   className="flex-1 py-2 rounded-xl text-xs font-bold bg-stone-800 hover:bg-stone-700 text-sky-400 transition-colors"
                 >
-                  Enviar
+                  {sendLabel ?? 'Enviar'}
                 </button>
               )}
             </div>

@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import { RARITY_COLORS } from '../game/data'
+import { RARITY_COLORS, ITEM_BY_ID } from '../game/data'
 import { useAuthStore } from '../store/authStore'
 import { useGameStore } from '../store/gameStore'
 import type { Equipment } from '../game/types'
 import { PageHeader } from '../components/PageHeader'
+import { ItemDetailModal } from '../components/ItemDetailModal'
 
 type Listing = {
   id: string
   itemData: {
+    id: string
     name: string
     icon: string
     rarity: 'common' | 'rare' | 'epic' | 'legendary'
@@ -35,6 +37,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [detailListing, setDetailListing] = useState<Listing | null>(null)
   const { user } = useAuthStore()
   const { addInventoryItem } = useGameStore()
 
@@ -121,6 +124,16 @@ export default function ShopPage() {
           </div>
         )}
 
+        {detailListing && (() => {
+          const eq = toEquipment(detailListing.itemData)
+          return eq ? (
+            <ItemDetailModal
+              item={eq}
+              onClose={() => setDetailListing(null)}
+            />
+          ) : null
+        })()}
+
         {loading ? (
           <div className="text-center text-amber-100/35 py-16">Carregando itens...</div>
         ) : listings.length === 0 ? (
@@ -133,13 +146,23 @@ export default function ShopPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
               {listings.map(listing => {
                 const item = listing.itemData
+                const sprite = ITEM_BY_ID[item.id]?.sprite
                 const bonusText = Object.entries(item.bonuses ?? {})
                   .map(([k, v]) => `+${v} ${k.toUpperCase()}`)
                   .join(', ')
 
                 return (
                   <div key={listing.id} className="bg-[#18120d] rounded-xl p-4 border border-amber-100/15 flex gap-3">
-                    <div className="text-3xl w-10 text-center shrink-0">{item.icon}</div>
+                    <button
+                      onClick={() => setDetailListing(listing)}
+                      className="w-14 h-14 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden shrink-0 hover:border-amber-500/40 transition-colors"
+                      title={`Ver detalhes de ${item.name}`}
+                    >
+                      {sprite
+                        ? <img src={sprite} alt={item.name} className="w-full h-full object-contain p-1" />
+                        : <span className="text-3xl">{item.icon}</span>
+                      }
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>

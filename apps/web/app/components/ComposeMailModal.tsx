@@ -4,10 +4,18 @@ import { useState, useCallback, useEffect } from 'react'
 import { api, HeroSearchResult } from '../lib/api'
 import { useGameStore } from '../store/gameStore'
 import { useAuthStore } from '../store/authStore'
-import { RARITY_COLORS } from '../game/data'
+import { ITEM_BY_ID } from '../game/data'
 import { getItemDisplayName } from '../game/enhancement'
 import { HeroProfileModal } from './HeroProfileModal'
+import { ItemDetailModal } from './ItemDetailModal'
 import type { Equipment } from '../game/types'
+
+const RARITY_BORDER: Record<Equipment['rarity'], string> = {
+  common:    'border-stone-500/50',
+  rare:      'border-blue-500/60',
+  epic:      'border-purple-500/60',
+  legendary: 'border-amber-500/70',
+}
 
 const TRANSFER_COST_PER_SEND = 500
 
@@ -52,6 +60,7 @@ export function ComposeMailModal({ preAttached, preRecipient, onClose, onSent }:
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [previewHero, setPreviewHero] = useState<HeroSearchResult | null>(null)
+  const [detailItem, setDetailItem] = useState<{ item: Equipment; idx: number } | null>(null)
 
   // Fetch DB inventory item IDs so we can attach them
   useEffect(() => {
@@ -301,6 +310,14 @@ export function ComposeMailModal({ preAttached, preRecipient, onClose, onSent }:
         </div>
 
         {/* --- Item attachments --- */}
+        {detailItem && (
+          <ItemDetailModal
+            item={detailItem.item}
+            onClose={() => setDetailItem(null)}
+            onSend={() => { toggleItem(detailItem.idx); setDetailItem(null) }}
+            sendLabel={attachedIdxs.has(detailItem.idx) ? 'Remover' : 'Anexar'}
+          />
+        )}
         <div>
           <label className="text-amber-100/50 text-[10px] uppercase font-bold mb-1.5 block tracking-widest">
             Itens anexados ({attachedIdxs.size})
@@ -309,31 +326,39 @@ export function ComposeMailModal({ preAttached, preRecipient, onClose, onSent }:
           {inventory.length === 0 ? (
             <p className="text-white/25 text-xs text-center py-3">Nenhum item no inventário.</p>
           ) : (
-            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto rounded-xl border border-white/5 bg-black/20 p-1.5">
+            <div className="grid grid-cols-5 gap-1.5 max-h-48 overflow-y-auto rounded-xl border border-white/5 bg-black/20 p-1.5">
               {inventory.map((item, idx) => {
                 const attached = attachedIdxs.has(idx)
+                const sprite = ITEM_BY_ID[item.id]?.sprite
                 const enhancement = item.enhancement ?? 0
                 return (
                   <button
                     key={`${item.id}-${idx}`}
-                    onClick={() => toggleItem(idx)}
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
-                      attached
-                        ? 'bg-emerald-900/30 border border-emerald-500/40'
-                        : 'bg-black/20 border border-white/5 hover:border-white/15'
-                    }`}
+                    onClick={() => setDetailItem({ item, idx })}
+                    title={getItemDisplayName(item)}
+                    className={`relative aspect-square rounded-lg border-2 bg-black/40 hover:bg-black/70 transition-all overflow-hidden group ${RARITY_BORDER[item.rarity]} ${attached ? 'ring-2 ring-emerald-500/60' : ''}`}
                   >
-                    <span className={`text-base shrink-0 w-7 text-center transition-all ${attached ? 'scale-110' : ''}`}>
-                      {attached ? '✓' : item.icon}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-bold truncate ${RARITY_COLORS[item.rarity]}`}>
-                        {getItemDisplayName(item)}
-                        {enhancement > 0 && <span className="text-green-400 ml-1">+{enhancement}</span>}
-                      </p>
-                      <p className="text-white/30 text-[10px] capitalize">{item.slot}</p>
-                    </div>
-                    {attached && <span className="text-emerald-400 text-xs shrink-0">✓</span>}
+                    {sprite ? (
+                      <img
+                        src={sprite}
+                        alt={item.name}
+                        className="w-full h-full object-contain p-1 group-hover:scale-110 transition-transform duration-150"
+                      />
+                    ) : (
+                      <span className="flex items-center justify-center h-full text-2xl group-hover:scale-110 transition-transform duration-150">
+                        {item.icon}
+                      </span>
+                    )}
+                    {enhancement > 0 && (
+                      <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold text-amber-300 bg-black/80 rounded px-0.5 leading-tight">
+                        +{enhancement}
+                      </span>
+                    )}
+                    {attached && (
+                      <div className="absolute inset-0 bg-emerald-900/40 flex items-start justify-end p-0.5">
+                        <span className="text-[9px] font-bold text-emerald-300 bg-black/70 rounded px-0.5 leading-tight">✓</span>
+                      </div>
+                    )}
                   </button>
                 )
               })}

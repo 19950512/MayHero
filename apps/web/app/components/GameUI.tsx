@@ -37,7 +37,7 @@ let sessionInventoryHydrated = false
 export function GameUI() {
   const [activeTab, setActiveTab] = useState<Tab>('battle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
-  const [showNotifications, setShowNotifications] = useState(true)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [unreadMail, setUnreadMail] = useState(0)
   const [composeItem, setComposeItem] = useState<Equipment | undefined>(undefined)
   const [composeOpen, setComposeOpen] = useState(false)
@@ -116,9 +116,32 @@ export function GameUI() {
     if (sessionInventoryHydrated) return
     api.hero.inventory()
       .then(dbItems => {
-        const items = dbItems
-          .map(db => toEquipment(db.itemData))
-          .filter((item): item is Equipment => !!item)
+        // Build sets to exclude equipped items (by DB record ID) and market-listed items
+        const equippedDbIds = new Set<string>()
+        const equippedTypeCounts = new Map<string, number>()
+        for (const slot of ['weapon', 'armor', 'helm', 'ring'] as const) {
+          const eq = hero.equipment[slot]
+          if (!eq) continue
+          if (eq.inventoryItemId) {
+            equippedDbIds.add(eq.inventoryItemId)
+          } else {
+            equippedTypeCounts.set(eq.id, (equippedTypeCounts.get(eq.id) ?? 0) + 1)
+          }
+        }
+        const remainingTypeCounts = new Map(equippedTypeCounts)
+
+        const items: Equipment[] = []
+        for (const db of dbItems) {
+          if (db.listing && db.listing.soldAt === null) continue
+          if (equippedDbIds.has(db.id)) continue
+          const typeId = db.itemData.id as string
+          if (remainingTypeCounts.has(typeId) && remainingTypeCounts.get(typeId)! > 0) {
+            remainingTypeCounts.set(typeId, remainingTypeCounts.get(typeId)! - 1)
+            continue
+          }
+          const eq = toEquipment(db.itemData)
+          if (eq) items.push({ ...eq, inventoryItemId: db.id })
+        }
         replaceInventory(items)
         sessionInventoryHydrated = true
       })
